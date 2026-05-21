@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/blunt.yaml + 噪音档 clean。
 id: out_of_scope
 personality: blunt
-noise: clean
 name: 越权问题型骑手
 
 initial_state: 接听

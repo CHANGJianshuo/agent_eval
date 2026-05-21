@@ -15,18 +15,39 @@
 
 ## 待完成任务清单
 
-- [ ] **Rubric 抽取器**:把任务 Prompt 拆解为原子化、可判定的检查项(YAML)。
-- [ ] **用户模拟器**:Persona × 状态机 × 探针注入,多类商家角色,可复现、可控覆盖率。
-- [ ] **对话 Runner**:多轮对话主循环,SUT ↔ 用户模拟器,trace 落盘(JSONL)。
-- [ ] **评分器**:规则评分(长度/黑名单/顺序/数字白名单/节奏)+ LLM Judge(语义类,须返回 evidence)。
-- [ ] **聚合 + Pass^k**:多 trial 采样,Safety 作乘子,产出维度分。
-- [ ] **评测报告**:HTML(对话回放 + 违规高亮 + 流程图 + 维度雷达图)。
-- [ ] **CLI**:`run / grade / batch / report`。
+### 已完成 ✅
+
+- [x] **用户模拟器**:状态机 + LLM + 探针;persona **三层结构**(性格 / 剧本 / 噪音 rate)。性格库 7 个,跨任务复用。
+- [x] **对话 Runner**:多轮主循环,trace JSONL,`reasoning_effort` 调优(单次 ~5 倍提速),并发对话(batch)。
+- [x] **评分器**:8 类规则匹配器(length / placeholder / keyword / number_whitelist / ordered_keyword / pace_checker / blacklist) + LLM Judge(强制返回 `evidence_turn_id`)。
+- [x] **聚合 + Pass^k**:三维度合并 + Safety 乘子 + Pass^k 公式。
+- [x] **评测报告**:**多页 HTML**(跨任务总览 + 每任务详情含 Persona × Rubric 热力图 + 单 case 对话回放含违规高亮 + 雷达图)。
+- [x] **CLI**:`run / batch / grade / report / dashboard` 五个命令。
+
+### 待完成(按优先级)
+
+**P0 核心交付:**
+- [ ] **Rubric 抽取器 + 6 类分类 + 人审 gate**:从任务 Prompt 自动产 rubric YAML,带类别(流程/知识/形式/风格/边界/安全)与抽取置信度,safety 类强制人审。
+- [ ] **比例分配采样**:`sampling.yaml` 配真实流量占比,batch 按 weights 分配 trial。
+- [ ] **任务流程图 + 报告按成功率着色**:每任务 `flow.yaml`,dashboard 用 ECharts 渲染节点,按 rubric pass rate 上色(红=弱/绿=强)。
+- [ ] **persona 编辑器 UI**:Streamlit 网页 —— 选性格底色 + 画状态机 + 配探针 + 设 noise rate。
+- [ ] **显式六步流水线 skill**:`extract-rubric / extract-personas / validate / 人审 gate / run-batch / report`,可独立跑/暂停/续跑。
+
+**P1 可信度与质量:**
+- [ ] **meta-eval**:Judge 校准 + rubric 查全率,评评测系统自身。
+- [ ] **actionable 改进建议**:报告产出「改 Prompt 哪几句、预期提升」。
+- [ ] **对抗探针**:prompt 注入 / 诱导越权,测 SUT 抗攻击。
+- [ ] **一致性检查**:validate 查命名 + 任务内权重和(不跨任务统一权重)。
+
+**P2 工程完善:** 回归对比 · 离线分 vs 线上 KPI 对标 · 概率转移状态机 · embedding 版 no_repeat。
 
 ## 当前进度
 
-- 已完成两份方案设计文档(见下),尚未开始编码。
-- 技术选型已定:**Python**(后端评测引擎),报告页可选 TS/Streamlit。
+- **MVP 完成并经实测验证**:**76 单测全绿**;用小米 MiMo Token Plan 真实跑过 34 个 case(美团 + 直播);多页 HTML 可视化报告;已 push 到 **https://github.com/CHANGJianshuo/agent_eval**。
+- **技术栈**:Python + Pydantic + Jinja2 + ECharts(报告页)+ LiteLLM(OpenAI 兼容)+ pytest;模型走小米 MiMo(SUT=`mimo-v2.5`,模拟器=`mimo-v2-pro`,Judge=`mimo-v2.5-pro`,`reasoning_effort=low/medium`)。
+- **仓库结构**:`src/claw_eval/`(共享引擎)+ `tasks/<id>/`(每任务 task.yaml + rubrics.yaml + grader.py + personas/)+ `personalities/`(7 个共享性格)+ `configs/noise_profiles.yaml`(噪音种类库)+ `tests/`(7 个测试文件)+ `reports/`(可视化产物)。
+- **当前任务数**:2 个任务 / 12 个 persona(美团 6 + 直播 6)/ 33 条 rubric / 8 类 matcher。
+- 详见 `reports/index.html` 查看可视化跑批结果。
 
 ## 仓库文件
 

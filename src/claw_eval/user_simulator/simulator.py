@@ -1,9 +1,14 @@
-"""用户模拟器 —— 状态机控走向 + LLM 生成话术 + 探针注入。
+"""用户模拟器 —— 状态机控走向 + LLM 生成话术 + 探针注入 + 按轮掷骰加噪。
 
-system prompt 由三层合成:性格(description/speaking_style)、
-噪音档(noise_instruction)、当前状态指令(state instruction)。
+system prompt 由 4 层合成:
+  ① 性格(description/speaking_style)
+  ② 噪音(per-turn 掷骰,命中才注入种类 instruction)
+  ③ 当前状态指令(state instruction)
+  ④ 通用规则
 """
 from __future__ import annotations
+
+import random
 
 from ..models.persona import Persona
 from ..models.trace import TraceMessage
@@ -12,7 +17,7 @@ from .probes import probe_for_turn
 from .state_machine import StateMachine
 
 _SYSTEM = """\
-你在模拟一位真实用户,正在接听一通电话。任务相关的背景由「当前状态」给出。
+你在模拟一位真实用户,正在接听一通电话。任务背景由「当前状态」给出。
 
 ## 你的性格
 {description}
@@ -35,13 +40,14 @@ class UserSimulator:
     """按状态机推进的模拟用户。"""
 
     def __init__(self, model: str, persona: Persona, temperature: float = 0.7,
-                 reasoning_effort: str | None = None):
+                 reasoning_effort: str | None = None, seed: int = 0):
         self.model = model
         self.persona = persona
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
         self.sm = StateMachine(persona)
         self.user_turn_index = 0
+        self._rng = random.Random(seed)
 
     def next(self, messages: list[TraceMessage]) -> tuple[str, str, bool, str | None]:
         """生成用户的下一句。返回 (话术, 当前状态, 是否对话结束, 探针ID)。"""
@@ -60,11 +66,20 @@ class UserSimulator:
         return text, state, done, probe_id
 
     # ------------------------------------------------------------------
+    def _roll_noise(self) -> str:
+        """按轮掷骰决定本轮是否加噪,以及加哪种。返回噪音 instruction(空串=不加)。"""
+        if not self.persona.noise_kinds or self.persona.noise_rate <= 0:
+            return ""
+        if self._rng.random() >= self.persona.noise_rate:
+            return ""
+        kind = self._rng.choice(self.persona.noise_kinds)
+        return kind.instruction
+
     def _generate(self, messages: list[TraceMessage]) -> str:
+        noise_instruction = self._roll_noise()
         noise_block = ""
-        if self.persona.noise_instruction:
-            noise_block = (f"\n## 输入特点(口语噪音)\n"
-                           f"{self.persona.noise_instruction}\n")
+        if noise_instruction:
+            noise_block = f"\n## 本轮噪音特点\n{noise_instruction}\n"
         system = _SYSTEM.format(
             description=self.persona.description,
             style=self.persona.speaking_style,

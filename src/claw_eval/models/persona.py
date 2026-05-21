@@ -1,13 +1,13 @@
-"""Persona 三层模型 —— 性格 + 剧本 + 噪音。
+"""Persona 三层模型 —— 性格 + 剧本 + 噪音(rate 版)。
 
-- 性格 Personality:任务无关,跨任务复用,决定「怎么说」(语气/用词)。
-  放 personalities/<id>.yaml。
-- 剧本 PersonaScript:任务专属,决定「测哪条逻辑分支」(状态机 + 探针)。
-  放 tasks/<task>/personas/<name>.yaml,引用一个性格 + 一个噪音档。
-- 噪音 NoiseProfile:正交档位,决定「输入有多脏」(口语噪音 / ASR 错误)。
-  放 configs/noise_profiles.yaml。
+- 性格 Personality:任务无关,跨任务复用,决定「怎么说」。
+- 剧本 PersonaScript:任务专属,决定「测哪条逻辑分支」。
+- 噪音 NoiseSpec (rate, kinds):
+    rate  = 每个用户轮被注入噪音的概率(per-turn 掷骰,seeded)
+    kinds = 噪音种类列表(引用 noise_profiles.yaml 里的种类 id)
+    rate=0(默认)→ 全干净;rate=1 → 每轮都脏;0<rate<1 → 部分轮脏。
 
-运行时 persona = 性格 + 剧本 + 噪音 合成为一个 Persona 对象。
+运行时 persona = 性格 + 剧本 + 噪音 合成。
 """
 from __future__ import annotations
 
@@ -26,12 +26,19 @@ class Personality(BaseModel):
     speaking_style: str
 
 
-class NoiseProfile(BaseModel):
-    """噪音档位 —— 注入模拟器 prompt,让用户输入更接近真实(脏)。"""
+class NoiseKind(BaseModel):
+    """一种噪音 —— 命中时其 instruction 注入「该轮」模拟器 prompt。"""
 
     id: str
     name: str
-    instruction: str = ""        # clean 档为空串
+    instruction: str = ""
+
+
+class NoiseSpec(BaseModel):
+    """剧本中的噪音规格 —— 频率(rate) + 种类(kinds 引用 NoiseKind id)。"""
+
+    rate: float = 0.0
+    kinds: list[str] = Field(default_factory=list)
 
 
 class ProbeConfig(BaseModel):
@@ -44,12 +51,12 @@ class ProbeConfig(BaseModel):
 
 
 class PersonaScript(BaseModel):
-    """任务剧本 —— 任务专属的状态机 + 探针;引用一个性格 + 一个噪音档。"""
+    """任务剧本 —— 任务专属的状态机 + 探针;引用一个性格 + 一份噪音规格。"""
 
     id: str
-    personality: str                     # 引用 personalities/<id>.yaml
-    noise: str = "clean"                 # 引用噪音档位
-    name: str = ""                       # 可选显示名
+    personality: str                                # 引用 personalities/<id>.yaml
+    noise: NoiseSpec = Field(default_factory=NoiseSpec)
+    name: str = ""
     states: dict[str, str]
     initial_state: str
     transitions: dict[str, str]
@@ -66,9 +73,9 @@ class Persona(BaseModel):
     personality_id: str
     description: str
     speaking_style: str
-    # —— 来自噪音层 ——
-    noise_id: str = "clean"
-    noise_instruction: str = ""
+    # —— 来自噪音层(rate 版)——
+    noise_rate: float = 0.0
+    noise_kinds: list[NoiseKind] = Field(default_factory=list)
     # —— 来自剧本层 ——
     states: dict[str, str]
     initial_state: str
@@ -82,36 +89,33 @@ def load_personality(path: str | Path) -> Personality:
         return Personality.model_validate(yaml.safe_load(f))
 
 
-def load_noise_profiles(path: str | Path) -> dict[str, NoiseProfile]:
-    """读 configs/noise_profiles.yaml → {id: NoiseProfile}。"""
+def load_noise_kinds(path: str | Path) -> dict[str, NoiseKind]:
+    """读 configs/noise_profiles.yaml → {id: NoiseKind}(噪音「种类库」)。"""
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    return {k: NoiseProfile(id=k, **v) for k, v in data.items()}
+    return {k: NoiseKind(id=k, **v) for k, v in data.items()}
 
 
 def load_persona(script_path: str | Path,
                  personalities_dir: str | Path | None = None,
                  noise_file: str | Path | None = None) -> Persona:
-    """加载一个 persona:剧本 + 引用的性格 + 引用的噪音档,合成运行时对象。
-
-    personalities_dir / noise_file 不传时,按目录结构推断
-    (script 位于 <root>/tasks/<task>/personas/<name>.yaml)。
-    """
+    """加载剧本 + 性格 + 噪音种类,合成运行时 Persona。"""
     script_path = Path(script_path).resolve()
     with open(script_path, encoding="utf-8") as f:
         script = PersonaScript.model_validate(yaml.safe_load(f))
 
-    root = script_path.parents[3]        # personas → task → tasks → root
+    root = script_path.parents[3]
     pdir = Path(personalities_dir) if personalities_dir else root / "personalities"
     nfile = Path(noise_file) if noise_file else root / "configs" / "noise_profiles.yaml"
 
     personality = load_personality(pdir / f"{script.personality}.yaml")
 
-    noise_instruction = ""
-    if Path(nfile).exists():
-        profiles = load_noise_profiles(nfile)
-        if script.noise in profiles:
-            noise_instruction = profiles[script.noise].instruction
+    noise_kinds: list[NoiseKind] = []
+    if script.noise.kinds and Path(nfile).exists():
+        library = load_noise_kinds(nfile)
+        for kind_id in script.noise.kinds:
+            if kind_id in library:
+                noise_kinds.append(library[kind_id])
 
     return Persona(
         id=script.id,
@@ -119,8 +123,8 @@ def load_persona(script_path: str | Path,
         personality_id=personality.id,
         description=personality.description,
         speaking_style=personality.speaking_style,
-        noise_id=script.noise,
-        noise_instruction=noise_instruction,
+        noise_rate=script.noise.rate,
+        noise_kinds=noise_kinds,
         states=script.states,
         initial_state=script.initial_state,
         transitions=script.transitions,

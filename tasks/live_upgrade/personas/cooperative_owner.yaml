@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/cooperative.yaml(与美团 cooperative 同一性格)。
 id: cooperative_owner
 personality: cooperative
-noise: clean
 name: 配合型机构负责人
 
 initial_state: 接听

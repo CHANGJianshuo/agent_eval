@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/argumentative.yaml + 噪音档 clean。
 id: argumentative
 personality: argumentative
-noise: clean
 name: 抬杠型骑手
 
 initial_state: 接听

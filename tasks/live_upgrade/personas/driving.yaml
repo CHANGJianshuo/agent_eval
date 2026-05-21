@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/hurried.yaml + 噪音档 clean。
 id: driving
 personality: hurried
-noise: clean
 name: 开车中型
 
 initial_state: 接听

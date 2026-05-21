@@ -19,17 +19,21 @@ def run_dialogue(task: TaskDefinition, persona: Persona,
                  sut_temperature: float = 0.7,
                  simulator_temperature: float = 0.7,
                  sut_reasoning_effort: str | None = None,
-                 simulator_reasoning_effort: str | None = None) -> Path:
+                 simulator_reasoning_effort: str | None = None,
+                 simulator_seed: int = 0) -> Path:
     """跑一通电话,trace 落盘,返回 trace 路径。
 
-    每轮:骑手先说 → 站长回应。骑手走到终止状态后,站长仍再回应最后一句
+    每轮:用户先说 → SUT 回应。用户走到终止状态后,SUT 仍再回应最后一句
     (用于捕捉「安抚后挂断」),然后结束。
+
+    simulator_seed:用户模拟器掷骰(噪音命中)用的种子,保证可复现。
     """
     trace_path = Path(trace_path)
     sut = SUTAdapter(sut_model, task.rendered_prompt(),
                      sut_temperature, sut_reasoning_effort)
     simulator = UserSimulator(simulator_model, persona,
-                              simulator_temperature, simulator_reasoning_effort)
+                              simulator_temperature, simulator_reasoning_effort,
+                              seed=simulator_seed)
 
     messages: list[TraceMessage] = []
     turn = 0

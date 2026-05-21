@@ -103,6 +103,7 @@ def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
         simulator_temperature=cfg["simulator"].get("temperature", 0.7),
         sut_reasoning_effort=cfg["sut"].get("reasoning_effort"),
         simulator_reasoning_effort=cfg["simulator"].get("reasoning_effort"),
+        simulator_seed=trial_idx + 1,    # 噪音掷骰种子,每 trial 不同但可复现
     )
     result = _grade_trace(trace_path, task_def, rubrics, judge)
     result.persona_id = persona_obj.id

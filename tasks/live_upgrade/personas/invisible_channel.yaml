@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/cooperative.yaml + 噪音档 clean。
 id: invisible_channel
 personality: cooperative
-noise: clean
 name: 第三方渠道未显示选项型
 
 initial_state: 接听

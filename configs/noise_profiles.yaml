@@ -1,22 +1,32 @@
-# 噪音档位 —— persona 的正交第三层,决定「用户输入有多脏」。
-# instruction 会注入用户模拟器的 system prompt。
-# 默认所有 persona 用 clean;噪音档作鲁棒性专项时再切换。
+# 噪音种类库(rate 版)
+#
+# 在 persona 剧本里:
+#   noise:
+#     rate: 0.25                   # 每个用户轮 25% 概率被注入噪音
+#     kinds: [filler, asr_error]   # 命中时,从这些种类里随机抽一种
+#
+# 模拟器实现:每轮掷一次种子化的骰子(rng based on trial seed),
+# random.random() < rate 时,从 kinds 抽一种,把该种 instruction
+# 加到「这一轮」的 system prompt;其余轮干净。
 
-clean:
-  name: 无噪音
-  instruction: ""
-
-light:
-  name: 轻度口语噪音
+filler:
+  name: 口语填充词
   instruction: |
-    回复时偶尔带一点口语填充词(如「呃」「那个」「就是」),
-    偶尔重复一两个字或半句话,但整体仍清楚可懂。
+    在回复里夹杂口语填充词或语气词(「呃」「那个」「就是」「然后嘛」),
+    但意思仍然清楚可懂。
 
-heavy:
-  name: 重度噪音(模拟嘈杂电话信道)
+asr_error:
+  name: 同音错字
   instruction: |
-    模拟嘈杂电话环境下的真实通话:
-    - 偶尔有同音字听错(如把专有名词说成相近的错词);
-    - 夹杂口语填充词和语气词,句子有时不完整;
-    - 偶尔答非所问,或要求对方再说一遍。
-    注意:仍要保持基本可沟通,不要完全无法理解。
+    模拟语音识别错误 —— 把回复里某一个词说成相近的同音错字
+    (例如把某专有名词说成同音的别字),其余部分仍正常。
+
+broken:
+  name: 半句话
+  instruction: |
+    句子说一半就停下,留个尾,等对方追问你才接着说。
+
+interrupt:
+  name: 打断
+  instruction: |
+    不等对方说完就抢话,只回应你想说的部分,显得急切。

@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/confused.yaml + 噪音档 clean。
 id: info_missing
 personality: confused
-noise: clean
 name: 信息缺失型骑手
 
 initial_state: 接听

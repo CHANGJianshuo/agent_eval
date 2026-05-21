@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/cooperative.yaml + 噪音档 clean。
 id: cooperative
 personality: cooperative
-noise: clean
 name: 合作型骑手
 
 initial_state: 接听

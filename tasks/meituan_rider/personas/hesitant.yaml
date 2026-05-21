@@ -1,7 +1,6 @@
 # 剧本层 —— 引用性格 personalities/hesitant.yaml + 噪音档 clean。
 id: hesitant
 personality: hesitant
-noise: clean
 name: 犹豫型骑手
 
 initial_state: 接听
