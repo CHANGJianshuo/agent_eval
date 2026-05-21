@@ -252,6 +252,77 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
             typer.echo(f"  [warn] dashboard 生成失败: {exc}")
 
 
+@app.command("safety-test")
+def safety_test(task: str = typer.Option(..., help="任务 id 或目录"),
+                trials: int = typer.Option(
+                    2, help="每对抗 persona 跑几次(默认 2,够采样不烧 token)"),
+                concurrency: int = typer.Option(0),
+                config: str = typer.Option(None),
+                label: str = typer.Option(
+                    "", help="run_id 标签;默认 safety_<时间戳>")):
+    """安全红队 —— 对抗 persona × safety rubric 专项,出红队报告。
+
+    自动选择 tasks/<task>/personas/ 下所有 adv_*.yaml 作为对抗 persona。
+    """
+    import json as _json
+    from .adversarial import (
+        build_red_team_report, format_red_team_terminal,
+    )
+    from .report.aggregate import load_results_dir
+
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    rubrics = load_rubrics(task_dir / "rubrics.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+    judge = _make_judge(cfg)
+
+    adv_personas = sorted(
+        f.stem for f in (task_dir / "personas").glob("adv_*.yaml"))
+    if not adv_personas:
+        typer.echo("[error] 没找到对抗 persona(以 adv_ 开头的剧本)")
+        typer.echo(f"  请在 tasks/{task}/personas/ 下加 adv_*.yaml")
+        raise typer.Exit(1)
+
+    typer.echo(f"\n═══ 安全红队测试 · {task_def.task_id} ═══")
+    typer.echo(f"对抗 persona({len(adv_personas)}):{adv_personas}")
+    typer.echo(f"× {trials} trials = {len(adv_personas) * trials} 次")
+
+    n_workers = concurrency or int(cfg.get("concurrency", 4))
+    run_id = label or ("safety_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+    typer.echo(f"  run_id = {run_id} → traces/{run_id}/\n")
+
+    pairs = [(name, i) for name in adv_personas for i in range(trials)]
+    with ThreadPoolExecutor(max_workers=n_workers) as ex:
+        futures = {
+            ex.submit(_run_one_trial, task_dir, task_def, rubrics,
+                      name, i, trials, cfg, judge, run_id): (name, i)
+            for name, i in pairs
+        }
+        done = 0
+        for fut in as_completed(futures):
+            done += 1
+            try:
+                fut.result()
+            except Exception as exc:  # noqa: BLE001
+                with _LOG_LOCK:
+                    typer.echo(f"  ✗ failed: {exc}")
+            with _LOG_LOCK:
+                typer.echo(f"  ({done}/{len(pairs)})")
+
+    results = [r for r in load_results_dir(_ROOT / "traces" / run_id)
+               if r.task_id == task_def.task_id]
+    report = build_red_team_report(results, rubrics)
+    typer.echo(format_red_team_terminal(report))
+
+    out_path = _ROOT / "reports" / f"safety_test_{task_def.task_id}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        _json.dumps(report, ensure_ascii=False, indent=2),
+        encoding="utf-8")
+    typer.echo(f"\nJSON → {out_path.relative_to(_ROOT)}")
+
+
 @app.command()
 def regression(task: str = typer.Option(..., help="任务 id 或目录"),
                old: str = typer.Option(..., help="旧版本 run_id(traces/ 子目录名)"),
