@@ -1,0 +1,264 @@
+"""CLI —— claw-eval run / grade / batch / report / dashboard。"""
+from __future__ import annotations
+
+import json
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from pathlib import Path
+
+import typer
+import yaml
+
+from .graders import scoring
+from .graders.llm_judge import LLMJudge
+from .graders.registry import get_grader
+from .models.persona import load_persona
+from .models.rubric import load_rubrics
+from .models.task import TaskDefinition
+from .runner import llm_client
+from .runner.dialogue_loop import run_dialogue
+from .runner.trace_io import load_trace
+
+app = typer.Typer(add_completion=False, help="对话模型指令遵循自动评测系统")
+
+_ROOT = Path(__file__).resolve().parents[2]      # 仓库根目录
+_LOG_LOCK = threading.Lock()                     # 并发输出避免完全错行
+
+
+# ------------------------------------------------------------------
+# 辅助
+# ------------------------------------------------------------------
+
+def _load_models_cfg(path: str | None) -> dict:
+    cfg_path = Path(path) if path else _ROOT / "configs" / "models.yaml"
+    with open(cfg_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _task_dir(task: str) -> Path:
+    p = Path(task)
+    return p if p.is_dir() else _ROOT / "tasks" / task
+
+
+def _configure_provider(cfg: dict) -> None:
+    """按 models.yaml 的 provider 段配置 LLM 网关(OpenAI 兼容)。"""
+    prov = cfg.get("provider")
+    if not prov:
+        return
+    base_url = prov.get("base_url")
+    key_env = prov.get("api_key_env", "")
+    api_key = os.environ.get(key_env) if key_env else None
+    if base_url and not api_key:
+        typer.echo(f"[warning] 环境变量 {key_env} 未设置,LLM 调用会失败。"
+                   f"请先 export {key_env}=<你的 API key>")
+    llm_client.configure(api_base=base_url, api_key=api_key)
+
+
+def _make_judge(cfg: dict) -> LLMJudge:
+    return LLMJudge(
+        cfg["judge"]["model"],
+        cfg["judge"].get("temperature", 0.0),
+        cfg["judge"].get("reasoning_effort"),
+    )
+
+
+def _grade_trace(trace_path, task: TaskDefinition, rubrics, judge):
+    _start, messages, _end = load_trace(trace_path)
+    grader = get_grader(task.task_dir)
+    result = grader.grade(messages, task, rubrics, judge)
+    result.trace_path = str(trace_path)
+    return result
+
+
+def _echo_result(result, prefix: str = "") -> None:
+    d = result.dimension_scores
+    with _LOG_LOCK:
+        typer.echo(f"{prefix}completion={d.completion}  robustness={d.robustness}  "
+                   f"safety={d.safety}")
+        for v in result.violations:
+            typer.echo(f"{prefix}⚠ [{v.rubric_id}] 第{v.turn}轮 {v.detail}")
+
+
+def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
+                   persona_name: str, trial_idx: int, total_trials: int,
+                   cfg: dict, judge, stamp: str) -> float:
+    """跑一个 trial(线程安全:每个 trial 各自的 trace 路径)。"""
+    persona_obj = load_persona(
+        task_dir / "personas" / f"{persona_name}.yaml",
+        personalities_dir=_ROOT / "personalities",
+        noise_file=_ROOT / "configs" / "noise_profiles.yaml",
+    )
+    trace_path = (
+        _ROOT / "traces"
+        / f"{task_def.task_id}_{persona_name}_{stamp}_t{trial_idx + 1}.jsonl"
+    )
+    run_dialogue(
+        task_def, persona_obj,
+        sut_model=cfg["sut"]["model"],
+        simulator_model=cfg["simulator"]["model"],
+        trace_path=trace_path,
+        sut_temperature=cfg["sut"].get("temperature", 0.7),
+        simulator_temperature=cfg["simulator"].get("temperature", 0.7),
+        sut_reasoning_effort=cfg["sut"].get("reasoning_effort"),
+        simulator_reasoning_effort=cfg["simulator"].get("reasoning_effort"),
+    )
+    result = _grade_trace(trace_path, task_def, rubrics, judge)
+    result.persona_id = persona_obj.id
+
+    out_path = trace_path.with_suffix(".result.json")
+    out_path.write_text(
+        json.dumps(result.model_dump(), ensure_ascii=False, indent=2),
+        encoding="utf-8")
+    with _LOG_LOCK:
+        typer.echo(f"  ✓ [{persona_name} t{trial_idx + 1}/{total_trials}] "
+                   f"task_score={result.task_score} passed={result.passed}")
+    return result.task_score
+
+
+# ------------------------------------------------------------------
+# 命令
+# ------------------------------------------------------------------
+
+@app.command()
+def run(task: str = typer.Option(..., help="任务 id 或目录"),
+        persona: str = typer.Option(..., help="persona 名"),
+        trials: int = typer.Option(1, help="采样次数(Pass^k)"),
+        config: str = typer.Option(None, help="模型配置 yaml"),
+        no_judge: bool = typer.Option(False)):
+    """跑「单任务 × 单 persona × N trials」(顺序),出 trace + result + 单 case HTML。"""
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    rubrics = load_rubrics(task_dir / "rubrics.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+    judge = None if no_judge else _make_judge(cfg)
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    typer.echo(f"\n=== {task_def.task_id} × {persona} (trials={trials}) ===")
+    scores = [
+        _run_one_trial(task_dir, task_def, rubrics, persona, i, trials,
+                       cfg, judge, stamp)
+        for i in range(trials)
+    ]
+
+    if trials > 1:
+        ph = scoring.compute_pass_hat_k(scores, k=trials)
+        typer.echo(f"\nPass^{trials} = {ph}   (task_scores={scores})")
+
+
+@app.command()
+def batch(task: str = typer.Option(..., help="任务 id 或目录"),
+          personas: str = typer.Option(
+              "", help="逗号分隔的 persona;留空 = 全部"),
+          trials: int = typer.Option(1),
+          config: str = typer.Option(None),
+          no_judge: bool = typer.Option(False),
+          concurrency: int = typer.Option(
+              0, help="并发对话数;0 = 用配置文件的默认"),
+          dashboard_out: bool = typer.Option(True)):
+    """对一个任务跑「多 persona × N trials」,case 间并行;跑完自动出 dashboard。"""
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    rubrics = load_rubrics(task_dir / "rubrics.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+    judge = None if no_judge else _make_judge(cfg)
+
+    if personas:
+        names = [p.strip() for p in personas.split(",") if p.strip()]
+    else:
+        names = sorted(p.stem for p in (task_dir / "personas").glob("*.yaml"))
+
+    n_workers = concurrency or int(cfg.get("concurrency", 4))
+    pairs = [(name, i) for name in names for i in range(trials)]
+    typer.echo(f"[batch] {task_def.task_id}: {len(names)} persona × {trials} trials "
+               f"= {len(pairs)} 次,并发 {n_workers}")
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    by_persona: dict[str, list[float]] = {name: [] for name in names}
+
+    with ThreadPoolExecutor(max_workers=n_workers) as ex:
+        futures = {
+            ex.submit(_run_one_trial, task_dir, task_def, rubrics,
+                      name, i, trials, cfg, judge, stamp): (name, i)
+            for name, i in pairs
+        }
+        done = 0
+        for fut in as_completed(futures):
+            name, idx = futures[fut]
+            done += 1
+            try:
+                score = fut.result()
+                by_persona[name].append(score)
+            except Exception as exc:  # noqa: BLE001
+                with _LOG_LOCK:
+                    typer.echo(f"  ✗ [{name} t{idx + 1}] 失败: {exc}")
+            with _LOG_LOCK:
+                typer.echo(f"      ({done}/{len(pairs)} 完成)")
+
+    typer.echo("\n[batch] 汇总:")
+    for name, scs in by_persona.items():
+        if len(scs) > 1:
+            ph = scoring.compute_pass_hat_k(scs, k=len(scs))
+            typer.echo(f"  {name:>20}: scores={[round(s,3) for s in scs]}  "
+                       f"Pass^{len(scs)}={ph}")
+        else:
+            typer.echo(f"  {name:>20}: scores={[round(s,3) for s in scs]}")
+
+    if dashboard_out:
+        typer.echo("\n[batch] 生成 dashboard…")
+        try:
+            from .report.builder import build_dashboard_from_dir
+            out = build_dashboard_from_dir(_ROOT / "traces", _ROOT / "reports")
+            typer.echo(f"Dashboard: {out}")
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"  [warn] dashboard 生成失败: {exc}")
+
+
+@app.command()
+def grade(trace: str = typer.Option(..., help="trace.jsonl 路径"),
+          task: str = typer.Option(...),
+          config: str = typer.Option(None),
+          no_judge: bool = typer.Option(False)):
+    """对已有 trace 重新评分。"""
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    rubrics = load_rubrics(task_dir / "rubrics.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+    judge = None if no_judge else _make_judge(cfg)
+
+    result = _grade_trace(Path(trace), task_def, rubrics, judge)
+    typer.echo(json.dumps(result.model_dump(), ensure_ascii=False, indent=2))
+
+
+@app.command()
+def report(result: str = typer.Option(...)):
+    """根据 result.json 渲染单 case HTML 报告。"""
+    from .report.builder import build_case_report, load_result
+    res = load_result(result)
+    out = (_ROOT / "reports"
+           / f"{Path(result).stem.replace('.result', '')}.html")
+    p = build_case_report(res, out)
+    typer.echo(f"报告: {p}")
+
+
+@app.command()
+def dashboard(traces_dir: str = typer.Option(None),
+              out_dir: str = typer.Option(None)):
+    """从 traces_dir 收集所有 result.json → 生成可视化 dashboard 网页。"""
+    from .report.builder import build_dashboard_from_dir
+    td = Path(traces_dir) if traces_dir else _ROOT / "traces"
+    od = Path(out_dir) if out_dir else _ROOT / "reports"
+    out = build_dashboard_from_dir(td, od)
+    typer.echo(f"Dashboard: {out}")
+
+
+def main() -> None:
+    app()
+
+
+if __name__ == "__main__":
+    main()

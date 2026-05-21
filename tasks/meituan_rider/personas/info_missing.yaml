@@ -1,0 +1,27 @@
+# 剧本层 —— 引用性格 personalities/confused.yaml + 噪音档 clean。
+id: info_missing
+personality: confused
+noise: clean
+name: 信息缺失型骑手
+
+initial_state: 接听
+states:
+  接听: 你刚接起电话,应一声。
+  听介绍: 你听站长介绍,但听得有点糊涂。
+  说不清: 你表示自己分不清是单日合同还是多日合同。
+  追问: 你请站长帮你说明两种合同的区别。
+  收尾: 你大致明白了,礼貌收尾。
+transitions:
+  接听: 听介绍
+  听介绍: 说不清
+  说不清: 追问
+  追问: 收尾
+  收尾: END
+
+probes:
+  - id: contract_confused
+    inject_at_turn: 3
+    text: 站长我有点懵,我到底是单日合同还是多日合同啊?这俩有啥区别?
+    description: 表示分不清合同类型,触发 faq.single_day 与 faq.multi_day
+
+max_rounds: 7

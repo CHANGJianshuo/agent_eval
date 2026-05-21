@@ -1,0 +1,20 @@
+# Claude Code 本地配置(含 API key,严禁提交)
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.venv/
+venv/
+
+# 运行产物(可由 CLI 重新生成)
+traces/
+reports/
+
+# 杂项
+.DS_Store
+*.swp

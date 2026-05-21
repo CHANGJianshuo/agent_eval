@@ -1,0 +1,25 @@
+# 全部角色走小米 MiMo 开放平台 · Token Plan(SGP 节点,OpenAI 兼容接口)。
+# API key 通过环境变量注入,不写入本文件:
+#   export XIAOMI_MIMO_API_KEY=tp-你的key
+provider:
+  base_url: "https://token-plan-sgp.xiaomimimo.com/v1"
+  api_key_env: "XIAOMI_MIMO_API_KEY"
+
+# 三个角色用不同模型,避免「自己评自己」/「同级偏袒」。
+# SGP Token Plan 可用对话模型:mimo-v2-pro / mimo-v2.5 / mimo-v2.5-pro。
+# reasoning_effort: low/medium/high —— 实测 low/medium 比默认快 5-8 倍。
+sut:                       # 被测对话模型(扮演站长)
+  model: "mimo-v2.5"
+  temperature: 0.7
+  reasoning_effort: "low"
+simulator:                 # 用户模拟器(扮演骑手)—— 与 SUT 不同模型
+  model: "mimo-v2-pro"
+  temperature: 0.7
+  reasoning_effort: "low"
+judge:                     # 评委 —— 用最高级 mimo-v2.5-pro,温度 0(确定性)
+  model: "mimo-v2.5-pro"
+  temperature: 0.0
+  reasoning_effort: "medium"
+
+# batch 命令的并发对话数(每条 case 内部串行,case 间并行)
+concurrency: 4

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>{{ task_name }} · 任务评测详情</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+         'Microsoft YaHei', sans-serif; margin: 0; padding: 24px;
+         background: #f7f8fa; color: #1f2329; line-height: 1.55; }
+  .container { max-width: 1400px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 8px; padding: 20px 24px;
+          margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { margin: 0 0 14px; font-size: 17px; color: #444;
+       border-left: 3px solid #3370ff; padding-left: 10px; }
+  .meta { color: #6b7280; font-size: 13px; }
+  .back { font-size: 13px; }
+  a { color: #3370ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 12px; }
+  .stat { text-align: center; padding: 14px; background: #f5f7fa; border-radius: 6px; }
+  .stat-num { font-size: 26px; font-weight: 600; }
+  .stat-label { color: #6b7280; font-size: 13px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee;
+           vertical-align: middle; }
+  th { background: #fafbfc; font-weight: 600; color: #4b5563; }
+  .score-good { color: #2ba471; font-weight: 600; }
+  .score-bad  { color: #d62a3e; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 3px;
+           font-size: 12px; font-weight: 600; }
+  .badge.pass { background: #e7f5ec; color: #2ba471; }
+  .badge.fail { background: #fde7e9; color: #d62a3e; }
+  .heat-wrap { overflow-x: auto; }
+  .heat { border-collapse: collapse; font-size: 12px; }
+  .heat th, .heat td { padding: 6px 8px; border: 1px solid #eaecef;
+                       text-align: center; min-width: 54px; }
+  .heat th.row-head { text-align: left; min-width: 150px; background: #fafbfc;
+                      font-weight: 600; }
+  .heat th.col-head {
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    background: #fafbfc; vertical-align: bottom; height: 150px;
+    padding: 6px 4px; font-weight: 500; white-space: nowrap; font-size: 11px;
+  }
+  .heat .cell-na { color: #9ca3af; background: #fafbfc; }
+  .dim-comp-text { color: #2563eb; }
+  .dim-robu-text { color: #ea8a16; }
+  .dim-safe-text { color: #16a34a; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #6b7280;
+            margin: 4px 0 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="card">
+    <div class="back"><a href="index.html">← 返回跨任务总览</a></div>
+    <h1>{{ task_name }}</h1>
+    <div class="meta">任务 id:{{ task_id }} · 单任务评测详情(persona × rubric 细分)</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num">{{ summary.total_runs }}</div>
+        <div class="stat-label">运行数</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">{{ summary.pass_count }}/{{ summary.total_runs }}</div>
+        <div class="stat-label">通过 / 总数</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num {% if summary.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ '%.1f' % (summary.pass_rate * 100) }}%</div>
+        <div class="stat-label">通过率</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num dim-comp-text">{{ '%.2f' % summary.avg_completion }}</div>
+        <div class="stat-label">平均完成度</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num dim-robu-text">{{ '%.2f' % summary.avg_robustness }}</div>
+        <div class="stat-label">平均鲁棒性</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>按 Persona 看</h2>
+    <table>
+      <thead><tr>
+        <th>Persona</th><th>运行数</th><th>通过</th><th>通过率</th>
+        <th>完成度</th><th>鲁棒性</th><th>安全</th>
+      </tr></thead>
+      <tbody>
+      {% for pid, bp in summary.by_persona.items() %}
+        <tr>
+          <td><strong>{{ pid }}</strong></td>
+          <td>{{ bp.n }}</td>
+          <td>{{ bp.pass_n }}</td>
+          <td class="{% if bp.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ '%.0f%%' % (bp.pass_rate * 100) }}</td>
+          <td>{{ '%.2f' % bp.completion }}</td>
+          <td>{{ '%.2f' % bp.robustness }}</td>
+          <td>{{ '%.2f' % bp.safety }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Persona × Rubric 热力图</h2>
+    <div class="legend">
+      <span>行 = persona,列 = 本任务 rubric。底色按维度
+        (<span class="dim-comp-text">蓝完成度</span> /
+         <span class="dim-robu-text">橙鲁棒性</span> /
+         <span class="dim-safe-text">绿安全</span>),深浅按得分。
+        灰 <code>·</code> = 未触发,不计分。</span>
+    </div>
+    <div class="heat-wrap">
+      <table class="heat">
+        <thead>
+          <tr>
+            <th class="row-head">Persona \ Rubric</th>
+            {% for rid in summary.rubric_order %}
+              {% set dim = summary.rubric_dim.get(rid, '') %}
+              <th class="col-head">
+                <span class="dim-{% if dim == 'completion' %}comp{% elif dim == 'robustness' %}robu{% else %}safe{% endif %}-text">{{ rid }}</span>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for pid, row in summary.heatmap.items() %}
+            <tr>
+              <th class="row-head">{{ pid }}</th>
+              {% for rid in summary.rubric_order %}
+                {% set v = row.get(rid) %}
+                {% if v is none %}
+                  <td class="cell-na">·</td>
+                {% else %}
+                  {% set dim = summary.rubric_dim.get(rid, '') %}
+                  {% if dim == 'completion' %}{% set hue = 210 %}
+                  {% elif dim == 'robustness' %}{% set hue = 30 %}
+                  {% else %}{% set hue = 142 %}{% endif %}
+                  {% set light = (95 - (v * 45)) | int %}
+                  <td style="background: hsl({{ hue }}, 80%, {{ light }}%); color: {% if v < 0.5 %}#1f2329{% else %}#fff{% endif %};">{{ '%.2f' % v }}</td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>按 Rubric 看(全 persona 合并)</h2>
+    <table>
+      <thead><tr>
+        <th>维度</th><th>Rubric</th><th>触发次数</th><th>平均得分</th>
+      </tr></thead>
+      <tbody>
+      {% for rid in summary.rubric_order %}
+        {% set br = summary.by_rubric.get(rid) %}
+        <tr>
+          <td><span class="dim-{% if summary.rubric_dim[rid] == 'completion' %}comp{% elif summary.rubric_dim[rid] == 'robustness' %}robu{% else %}safe{% endif %}-text">{{ summary.rubric_dim[rid] }}</span></td>
+          <td>{{ rid }}</td>
+          <td>{% if br %}{{ br.n }}{% else %}0{% endif %}</td>
+          <td class="{% if br and br.avg_score >= 0.8 %}score-good{% elif br and br.avg_score < 0.5 %}score-bad{% endif %}">{% if br %}{{ '%.2f' % br.avg_score }}{% else %}— 未触发{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>全部运行 ({{ summary.runs|length }})</h2>
+    <table>
+      <thead><tr>
+        <th>#</th><th>Persona</th><th>task_score</th>
+        <th>完成度</th><th>鲁棒性</th><th>安全</th><th>结果</th><th>详情</th>
+      </tr></thead>
+      <tbody>
+      {% for r in summary.runs %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r.persona_id }}</td>
+          <td class="{% if r.passed %}score-good{% else %}score-bad{% endif %}">{{ '%.4f' % r.task_score }}</td>
+          <td>{{ '%.2f' % r.completion }}</td>
+          <td>{{ '%.2f' % r.robustness }}</td>
+          <td>{{ '%.2f' % r.safety }}</td>
+          <td>{% if r.passed %}<span class="badge pass">通过</span>{% else %}<span class="badge fail">未通过</span>{% endif %}</td>
+          <td>{% if r.report_link %}<a href="{{ r.report_link }}">单 case →</a>{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

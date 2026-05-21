@@ -1,0 +1,27 @@
+# 剧本层 —— 引用性格 personalities/refuse.yaml + 噪音档 clean。
+id: refuse
+personality: refuse
+noise: clean
+name: 拒绝型骑手
+
+initial_state: 接听
+states:
+  接听: 你刚接起电话,简单应一声。
+  听介绍: 你在听站长说飞毛腿的事,反应比较平淡。
+  犹豫: 你表示今天不太想跑单,但还没把话说死。
+  拒绝: 你明确说今天不想配送了。
+  坚持拒绝: 不管站长怎么劝,你都坚持今天确实跑不了,语气坚决。
+transitions:
+  接听: 听介绍
+  听介绍: 犹豫
+  犹豫: 拒绝
+  拒绝: 坚持拒绝
+  坚持拒绝: END
+
+probes:
+  - id: out_of_scope
+    inject_at_turn: 3
+    text: 对了我问下,飞毛腿的佣金比例到底多少?能不能帮我换个站点?
+    description: 询问越权问题,触发 behavior.out_of_scope
+
+max_rounds: 8
