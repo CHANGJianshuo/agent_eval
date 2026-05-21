@@ -59,7 +59,10 @@ class PersonaScript(BaseModel):
     name: str = ""
     states: dict[str, str]
     initial_state: str
-    transitions: dict[str, str]
+    # transitions 值两种形式:
+    #   - str  → 确定性单一目标(老格式,向后兼容)
+    #   - dict[str, float] → 概率多分支 {next_state: weight}
+    transitions: dict[str, str | dict[str, float]]
     probes: list[ProbeConfig] = Field(default_factory=list)
     max_rounds: int = 12
 
@@ -79,7 +82,7 @@ class Persona(BaseModel):
     # —— 来自剧本层 ——
     states: dict[str, str]
     initial_state: str
-    transitions: dict[str, str]
+    transitions: dict[str, str | dict[str, float]]
     probes: list[ProbeConfig] = Field(default_factory=list)
     max_rounds: int = 12
 

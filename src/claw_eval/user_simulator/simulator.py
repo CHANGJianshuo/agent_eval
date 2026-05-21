@@ -45,9 +45,10 @@ class UserSimulator:
         self.persona = persona
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
-        self.sm = StateMachine(persona)
-        self.user_turn_index = 0
         self._rng = random.Random(seed)
+        # state machine 共用同一个 RNG,保证概率 transitions 也可复现
+        self.sm = StateMachine(persona, rng=self._rng)
+        self.user_turn_index = 0
 
     def next(self, messages: list[TraceMessage]) -> tuple[str, str, bool, str | None]:
         """生成用户的下一句。返回 (话术, 当前状态, 是否对话结束, 探针ID)。"""

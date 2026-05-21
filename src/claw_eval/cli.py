@@ -196,6 +196,7 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
             picked = {p.strip() for p in personas.split(",") if p.strip()}
             weights = {k: v for k, v in weights.items() if k in picked}
         alloc = {k: n for k, n in allocate(weights, total).items() if n > 0}
+        names = list(alloc.keys())
         pairs = [(name, i) for name, n in alloc.items() for i in range(n)]
         dist = ", ".join(f"{k}×{v}" for k, v in alloc.items())
         typer.echo(f"[batch · 比例分配] {task_def.task_id}: total={total} → "

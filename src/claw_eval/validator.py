@@ -131,16 +131,57 @@ def _trigger_reachable(trigger: TriggerSpec, personas: list[Persona]) -> bool:
 
 def check_state_termination(personas: list[Persona],
                             max_steps: int = 50) -> list[Issue]:
+    """图论检查:概率 transitions 支持下,必须**每个 reachable state 都能到达 END**。
+
+    确定性 transitions 是该检查的特例(每个 state 唯一 outgoing)。
+    """
     out: list[Issue] = []
+    END_S = "END"
     for p in personas:
-        sm = StateMachine(p)
-        for _ in range(max_steps):
-            if sm.advance():
-                break
-        if not sm.finished:
+        # 邻接表:每个 state → 所有可能的下一站
+        adj: dict[str, set[str]] = {}
+        for src in p.states.keys():
+            spec = p.transitions.get(src)
+            if spec is None:
+                adj[src] = {END_S}
+            elif isinstance(spec, str):
+                adj[src] = {spec}
+            elif isinstance(spec, dict):
+                adj[src] = set(spec.keys())
+            else:
+                adj[src] = set()
+
+        # 正向 BFS:从 initial_state 出发可达的所有 state
+        reachable = {p.initial_state}
+        stack = [p.initial_state]
+        while stack:
+            cur = stack.pop()
+            if cur == END_S:
+                continue
+            for nxt in adj.get(cur, set()):
+                if nxt not in reachable:
+                    reachable.add(nxt)
+                    stack.append(nxt)
+
+        # 反向闭包:能到 END 的 state 集合
+        can_reach_end = {END_S}
+        changed = True
+        while changed:
+            changed = False
+            for src, neighbors in adj.items():
+                if src in can_reach_end:
+                    continue
+                if any(n in can_reach_end for n in neighbors):
+                    can_reach_end.add(src)
+                    changed = True
+
+        # 检查:reachable 中每个 state 都必须能到达 END
+        bad = reachable - can_reach_end - {END_S}
+        if bad:
             out.append(Issue(
                 "error", "no_terminate",
-                f"persona '{p.id}' 状态机 {max_steps} 步未到 END(可能转移表有环或漏写)"))
+                f"persona '{p.id}' 状态机有 state 无法到达 END: {sorted(bad)}"
+                f"(可能有环 / 漏写转移)"))
     return out
 
 
