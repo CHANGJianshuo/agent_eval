@@ -118,10 +118,16 @@ def aggregate(results: list[GradingResult]) -> AggregateSummary:
     return s
 
 
-def load_results_dir(traces_dir: str | Path) -> list[GradingResult]:
-    """读 traces_dir 下所有 *.result.json,返回 GradingResult 列表。"""
+def load_results_dir(traces_dir: str | Path,
+                     recursive: bool = True) -> list[GradingResult]:
+    """读 traces_dir 下所有 *.result.json,返回 GradingResult 列表。
+
+    recursive=True(默认)→ 递归扫子目录(traces/<run_id>/*.result.json)。
+    既支持新的「run_id 子目录」布局,也兼容旧的扁平布局。
+    """
+    pattern = "**/*.result.json" if recursive else "*.result.json"
     out: list[GradingResult] = []
-    for p in sorted(Path(traces_dir).glob("*.result.json")):
+    for p in sorted(Path(traces_dir).glob(pattern)):
         with open(p, encoding="utf-8") as f:
             out.append(GradingResult.model_validate(json.load(f)))
     return out

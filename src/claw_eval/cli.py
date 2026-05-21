@@ -83,16 +83,19 @@ def _echo_result(result, prefix: str = "") -> None:
 
 def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
                    persona_name: str, trial_idx: int, total_trials: int,
-                   cfg: dict, judge, stamp: str) -> float:
-    """跑一个 trial(线程安全:每个 trial 各自的 trace 路径)。"""
+                   cfg: dict, judge, run_id: str) -> float:
+    """跑一个 trial(线程安全:每个 trial 各自的 trace 路径)。
+
+    输出落到 traces/<run_id>/ 子目录,便于按 run 分组回归对比。
+    """
     persona_obj = load_persona(
         task_dir / "personas" / f"{persona_name}.yaml",
         personalities_dir=_ROOT / "personalities",
         noise_file=_ROOT / "configs" / "noise_profiles.yaml",
     )
     trace_path = (
-        _ROOT / "traces"
-        / f"{task_def.task_id}_{persona_name}_{stamp}_t{trial_idx + 1}.jsonl"
+        _ROOT / "traces" / run_id
+        / f"{task_def.task_id}_{persona_name}_t{trial_idx + 1}.jsonl"
     )
     run_dialogue(
         task_def, persona_obj,
@@ -127,8 +130,10 @@ def run(task: str = typer.Option(..., help="任务 id 或目录"),
         persona: str = typer.Option(..., help="persona 名"),
         trials: int = typer.Option(1, help="采样次数(Pass^k)"),
         config: str = typer.Option(None, help="模型配置 yaml"),
-        no_judge: bool = typer.Option(False)):
-    """跑「单任务 × 单 persona × N trials」(顺序),出 trace + result + 单 case HTML。"""
+        no_judge: bool = typer.Option(False),
+        label: str = typer.Option(
+            "", help="run_id 标签;默认时间戳。用于回归对比")):
+    """跑「单任务 × 单 persona × N trials」,出 trace + result + 单 case HTML。"""
     task_dir = _task_dir(task)
     task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
     rubrics = load_rubrics(task_dir / "rubrics.yaml")
@@ -136,11 +141,12 @@ def run(task: str = typer.Option(..., help="任务 id 或目录"),
     _configure_provider(cfg)
     judge = None if no_judge else _make_judge(cfg)
 
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    typer.echo(f"\n=== {task_def.task_id} × {persona} (trials={trials}) ===")
+    run_id = label or datetime.now().strftime("%Y%m%d_%H%M%S")
+    typer.echo(f"\n=== {task_def.task_id} × {persona} "
+               f"(trials={trials}, run_id={run_id}) ===")
     scores = [
         _run_one_trial(task_dir, task_def, rubrics, persona, i, trials,
-                       cfg, judge, stamp)
+                       cfg, judge, run_id)
         for i in range(trials)
     ]
 
@@ -160,7 +166,9 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
           no_judge: bool = typer.Option(False),
           concurrency: int = typer.Option(
               0, help="并发对话数;0 = 用配置文件的默认"),
-          dashboard_out: bool = typer.Option(True)):
+          dashboard_out: bool = typer.Option(True),
+          label: str = typer.Option(
+              "", help="run_id 标签(回归对比用);默认时间戳")):
     """跑「多 persona × N trials」,case 间并行;跑完自动出 dashboard。
 
     两种模式:
@@ -202,13 +210,14 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
         typer.echo(f"[batch · uniform] {task_def.task_id}: {len(names)} persona × "
                    f"{trials} trials = {len(pairs)} 次,并发 {n_workers}")
 
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = label or datetime.now().strftime("%Y%m%d_%H%M%S")
+    typer.echo(f"  run_id = {run_id} → traces/{run_id}/")
     by_persona: dict[str, list[float]] = {name: [] for name in names}
 
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         futures = {
             ex.submit(_run_one_trial, task_dir, task_def, rubrics,
-                      name, i, trials, cfg, judge, stamp): (name, i)
+                      name, i, trials, cfg, judge, run_id): (name, i)
             for name, i in pairs
         }
         done = 0
@@ -241,6 +250,50 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
             typer.echo(f"Dashboard: {out}")
         except Exception as exc:  # noqa: BLE001
             typer.echo(f"  [warn] dashboard 生成失败: {exc}")
+
+
+@app.command()
+def regression(task: str = typer.Option(..., help="任务 id 或目录"),
+               old: str = typer.Option(..., help="旧版本 run_id(traces/ 子目录名)"),
+               new: str = typer.Option(..., help="新版本 run_id"),
+               threshold: float = typer.Option(0.05, help="显著性阈值"),
+               out: str = typer.Option("", help="JSON 输出路径(默认 reports/)")):
+    """对比同任务两次 run 的结果差异(rubric / persona / 维度三层 diff)。"""
+    from .report.aggregate import load_results_dir
+    from .report.regression import (
+        compute_regression, format_regression_terminal, save_regression,
+    )
+
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+
+    def _resolve(name: str) -> Path:
+        p = Path(name)
+        return p if p.is_dir() else _ROOT / "traces" / name
+
+    old_dir = _resolve(old)
+    new_dir = _resolve(new)
+    if not old_dir.exists():
+        typer.echo(f"[error] old run 不存在: {old_dir}")
+        raise typer.Exit(1)
+    if not new_dir.exists():
+        typer.echo(f"[error] new run 不存在: {new_dir}")
+        raise typer.Exit(1)
+
+    old_results = load_results_dir(old_dir)
+    new_results = load_results_dir(new_dir)
+
+    rep = compute_regression(
+        old_results, new_results, task_def.task_id,
+        old_label=old, new_label=new, threshold=threshold)
+
+    typer.echo(format_regression_terminal(rep))
+
+    out_path = (Path(out) if out
+                else _ROOT / "reports" / f"regression_{task_def.task_id}.json")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    save_regression(rep, out_path)
+    typer.echo(f"\nJSON → {out_path}")
 
 
 @app.command()
