@@ -82,6 +82,19 @@
     </div>
   </div>
 
+  {% if flow_option %}
+  <div class="card">
+    <h2>任务流程图 · 节点按 rubric 跨 case 平均得分着色</h2>
+    <div class="meta" style="margin-bottom:8px;">
+      <span style="color:#22c55e;font-weight:600">●</span> ≥0.8 强 ·
+      <span style="color:#eab308;font-weight:600">●</span> 0.5-0.8 中 ·
+      <span style="color:#ef4444;font-weight:600">●</span> &lt;0.5 弱 ·
+      <span style="color:#9ca3af;font-weight:600">●</span> 未触发 / 无关联 rubric
+    </div>
+    <div id="flow" style="height: 380px;"></div>
+  </div>
+  {% endif %}
+
   <div class="card">
     <h2>按 Persona 看</h2>
     <table>
@@ -196,5 +209,16 @@
   </div>
 
 </div>
+
+{% if flow_option %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script>
+(function(){
+  var el = document.getElementById('flow');
+  if (!el || !window.echarts) return;
+  echarts.init(el).setOption({{ flow_option | tojson }});
+})();
+</script>
+{% endif %}
 </body>
 </html>

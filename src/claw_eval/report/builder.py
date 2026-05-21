@@ -13,9 +13,15 @@ from pathlib import Path
 
 import yaml
 
+from ..models.flow import load_flow
 from ..models.trace import GradingResult, TraceMessage
 from ..runner.trace_io import load_trace
 from .aggregate import aggregate, load_results_dir
+from .flow_viz import (
+    aggregate_rubric_scores,
+    build_flow_option,
+    case_rubric_scores,
+)
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -48,8 +54,27 @@ def _build_turn_view(messages: list[TraceMessage], result: GradingResult):
     } for m in messages]
 
 
-def build_case_report(result: GradingResult, out_path: str | Path) -> Path:
-    """渲染单 case HTML 报告。"""
+def _infer_task_dir(result: GradingResult) -> Path | None:
+    """从 result.trace_path 推 tasks/<task_id>/。trace 路径形如 <root>/traces/X.jsonl。"""
+    if not result.trace_path:
+        return None
+    return Path(result.trace_path).resolve().parents[1] / "tasks" / result.task_id
+
+
+def _flow_option_for_case(result: GradingResult,
+                          task_dir: Path | None) -> dict | None:
+    if not task_dir:
+        return None
+    flow = load_flow(Path(task_dir) / "flow.yaml")
+    if not flow:
+        return None
+    scores = case_rubric_scores(result.rubric_scores)
+    return build_flow_option(flow, scores)
+
+
+def build_case_report(result: GradingResult, out_path: str | Path,
+                      task_dir: str | Path | None = None) -> Path:
+    """渲染单 case HTML 报告。task_dir 不传时按 trace 路径推断,用于加载 flow.yaml。"""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -57,12 +82,16 @@ def build_case_report(result: GradingResult, out_path: str | Path) -> Path:
     if result.trace_path and Path(result.trace_path).exists():
         _start, messages, _end = load_trace(result.trace_path)
 
+    tdir = Path(task_dir) if task_dir else _infer_task_dir(result)
+    flow_option = _flow_option_for_case(result, tdir)
+
     html = _env().get_template("case_report.html.j2").render(
         result=result,
         dim=result.dimension_scores,
         turns=_build_turn_view(messages, result),
         triggered=[r for r in result.rubric_scores if r.triggered],
         skipped=[r for r in result.rubric_scores if not r.triggered],
+        flow_option=flow_option,
     )
     out_path.write_text(html, encoding="utf-8")
     return out_path
@@ -93,10 +122,19 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
         task_results = groups[task_id]
         summary = aggregate(task_results)
 
-        # 每条 result 出单 case 报告,并把相对链接挂到 summary.runs 上
+        # 推断 tasks/<id>/ 读 flow.yaml,生成「跨 case 平均」着色的流程图
+        task_dir = _infer_task_dir(task_results[0]) if task_results else None
+        flow_option = None
+        if task_dir:
+            flow = load_flow(task_dir / "flow.yaml")
+            if flow:
+                flow_option = build_flow_option(
+                    flow, aggregate_rubric_scores(summary.by_rubric))
+
+        # 每条 result 出单 case 报告(传 task_dir 让单 case 流程图也能渲染)
         for idx, (run, r) in enumerate(zip(summary.runs, task_results)):
             stem = f"{task_id}_{r.persona_id or 'unknown'}_{idx + 1:02d}"
-            build_case_report(r, cases_dir / f"{stem}.html")
+            build_case_report(r, cases_dir / f"{stem}.html", task_dir=task_dir)
             run["report_link"] = f"cases/{stem}.html"
 
         page_file = f"task_{task_id}.html"
@@ -104,6 +142,7 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             task_id=task_id,
             task_name=task_names.get(task_id, task_id),
             summary=summary,
+            flow_option=flow_option,
         )
         (out_dir / page_file).write_text(html, encoding="utf-8")
 

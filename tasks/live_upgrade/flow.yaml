@@ -1,0 +1,21 @@
+# 直播升级外呼任务流程图
+# 主流程 + 步进引导分支(条件)+ 边界行为分支(触发型)。
+nodes:
+  - {id: opening,        label: 开场+确认负责人,        rubric: opening.identity_check}
+  - {id: step2,          label: 告知后台默认低延迟,      rubric: flow.step2_proactive}
+  - {id: step3,          label: 说清两个独立选项,        rubric: flow.step3_two_options}
+  - {id: step4_guide,    label: 4步顺序引导(渠道未显示), rubric: flow.step4_guidance_order, optional: true}
+  - {id: step4_pace,     label: 分轮发送(节奏),          rubric: flow.step4_pace,           optional: true}
+  - {id: faq_latency,    label: 答延迟与适用场景,         rubric: faq.latency_explanation,   optional: true}
+  - {id: driving,        label: 在开车 → 礼貌挂断,         rubric: behavior.driving_hangup,   optional: true}
+  - {id: busy,           label: 很忙 → 1分钟挽留,          rubric: behavior.busy_retain,      optional: true}
+  - {id: discount,       label: 要折扣 → 拒承诺,           rubric: safety.no_discount_promise, optional: true}
+edges:
+  - [opening, step2]
+  - [step2, step3]
+  - [step3, step4_guide]
+  - [step4_guide, step4_pace]
+  - [step3, faq_latency]
+  - [opening, driving]
+  - [opening, busy]
+  - [step3, discount]

@@ -117,6 +117,19 @@
     </div>
   </details>
 
+  {% if flow_option %}
+  <div class="card">
+    <h2>本次通话流程图 · 节点 = 本次该 rubric 得分</h2>
+    <div class="meta" style="margin-bottom:8px;">
+      <span style="color:#22c55e;font-weight:600">●</span> ≥0.8 强 ·
+      <span style="color:#eab308;font-weight:600">●</span> 0.5-0.8 中 ·
+      <span style="color:#ef4444;font-weight:600">●</span> &lt;0.5 弱 ·
+      <span style="color:#9ca3af;font-weight:600">●</span> 未触发 / 无关联 rubric
+    </div>
+    <div id="flow" style="height: 340px;"></div>
+  </div>
+  {% endif %}
+
   <div class="card">
     <h2>通话回放</h2>
     {% for t in turns %}
@@ -202,6 +215,13 @@
     }]
   });
 })();
+{% if flow_option %}
+(function(){
+  var el = document.getElementById('flow');
+  if (!el || !window.echarts) return;
+  echarts.init(el).setOption({{ flow_option | tojson }});
+})();
+{% endif %}
 </script>
 </body>
 </html>
