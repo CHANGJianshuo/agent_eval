@@ -123,6 +123,120 @@
   </div>
   {% endif %}
 
+  {% if regression %}
+  <div class="card" style="background: #eff6ff; border-left: 4px solid #3370ff;">
+    <h2 style="border-left-color: #3370ff;">📊 回归对比 · {{ regression.old_label }} → {{ regression.new_label }}</h2>
+    <div class="meta" style="margin-bottom:10px;">
+      显著变化阈值 ±{{ regression.threshold }} ·
+      <span style="color:#22c55e;font-weight:600">{{ regression.n_improvements }} 改进</span> ·
+      <span style="color:#ef4444;font-weight:600">{{ regression.n_regressions }} 退化</span>
+    </div>
+
+    {# ---- 总览 ---- #}
+    <table style="margin-bottom:14px; max-width:600px;">
+      <thead><tr>
+        <th></th>
+        <th>{{ regression.old_label }}</th>
+        <th>{{ regression.new_label }}</th>
+        <th>Δ</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>case 数</td>
+          <td>{{ regression.old_total }}</td>
+          <td>{{ regression.new_total }}</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td><strong>task_score 平均</strong></td>
+          <td>{{ '%.3f' % regression.old_score_avg }}</td>
+          <td>{{ '%.3f' % regression.new_score_avg }}</td>
+          {% set d = regression.new_score_avg - regression.old_score_avg %}
+          <td class="{% if d > regression.threshold %}score-good{% elif d < -regression.threshold %}score-bad{% endif %}"><strong>{{ '%+.3f' % d }}</strong></td>
+        </tr>
+        <tr>
+          <td><strong>通过率</strong></td>
+          <td>{{ '%.0f%%' % (regression.old_pass_rate * 100) }}</td>
+          <td>{{ '%.0f%%' % (regression.new_pass_rate * 100) }}</td>
+          {% set d = regression.new_pass_rate - regression.old_pass_rate %}
+          <td class="{% if d > regression.threshold %}score-good{% elif d < -regression.threshold %}score-bad{% endif %}"><strong>{{ '%+.1f' % (d * 100) }} pp</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    {# ---- 按维度 ---- #}
+    <h3 style="margin-top:14px; font-size:15px;">按维度</h3>
+    <table style="max-width:600px;">
+      <thead><tr><th>维度</th><th>{{ regression.old_label }}</th><th>{{ regression.new_label }}</th><th>Δ</th></tr></thead>
+      <tbody>
+      {% for row in regression.by_dimension %}
+        <tr>
+          <td>{{ row[0] }}</td>
+          <td>{{ '%.2f' % row[1] }}</td>
+          <td>{{ '%.2f' % row[2] }}</td>
+          <td class="{% if row[3] > regression.threshold %}score-good{% elif row[3] < -regression.threshold %}score-bad{% endif %}">{{ '%+.2f' % row[3] }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {# ---- 按 Rubric(只显示显著变化)---- #}
+    <h3 style="margin-top:14px; font-size:15px;">按 Rubric · 显著变化</h3>
+    {% set rubric_changes = regression.by_rubric | rejectattr('significance', 'equalto', 'flat') | list %}
+    {% if rubric_changes %}
+    <table>
+      <thead><tr>
+        <th>Rubric</th><th>维度</th>
+        <th>{{ regression.old_label }}</th><th>{{ regression.new_label }}</th>
+        <th>Δ</th><th>变化类型</th>
+      </tr></thead>
+      <tbody>
+      {% for r in rubric_changes %}
+        <tr>
+          <td><strong>{{ r.rubric_id }}</strong></td>
+          <td><span class="dim-{% if r.dimension == 'completion' %}comp{% elif r.dimension == 'robustness' %}robu{% else %}safe{% endif %}-text">{{ r.dimension }}</span></td>
+          <td>{% if r.old_avg is not none %}{{ '%.2f' % r.old_avg }}{% else %}—{% endif %}</td>
+          <td>{% if r.new_avg is not none %}{{ '%.2f' % r.new_avg }}{% else %}—{% endif %}</td>
+          <td class="{% if r.significance == 'improve' %}score-good{% elif r.significance == 'regress' %}score-bad{% endif %}">
+            {% if r.delta is not none %}{{ '%+.2f' % r.delta }}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r.significance == 'improve' %}<span style="color:#22c55e;">↑ 改进</span>
+            {% elif r.significance == 'regress' %}<span style="color:#ef4444;">↓ 退化</span>
+            {% elif r.significance == 'added' %}<span style="color:#3370ff;">+ 新增</span>
+            {% elif r.significance == 'removed' %}<span style="color:#6b7280;">− 删除</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="meta">(无 ≥ {{ regression.threshold }} 的 rubric 变化)</div>
+    {% endif %}
+
+    {# ---- 按 Persona(只显示通过率显著变化)---- #}
+    {% set persona_changes = regression.by_persona | selectattr('delta_pass_rate', 'defined') | rejectattr('delta_pass_rate', 'none') | list %}
+    {% set persona_signif = persona_changes | selectattr('delta_pass_rate', 'gt', regression.threshold) | list + persona_changes | selectattr('delta_pass_rate', 'lt', -regression.threshold) | list %}
+    {% if persona_signif %}
+    <h3 style="margin-top:14px; font-size:15px;">按 Persona · 通过率显著变化</h3>
+    <table style="max-width:600px;">
+      <thead><tr><th>Persona</th><th>{{ regression.old_label }}</th><th>{{ regression.new_label }}</th><th>Δ pass</th></tr></thead>
+      <tbody>
+      {% for p in persona_signif %}
+        <tr>
+          <td><strong>{{ p.persona_id }}</strong></td>
+          <td>{{ '%.0f%%' % (p.old_pass_rate * 100) }}</td>
+          <td>{{ '%.0f%%' % (p.new_pass_rate * 100) }}</td>
+          <td class="{% if p.delta_pass_rate > 0 %}score-good{% else %}score-bad{% endif %}">{{ '%+.0f%%' % (p.delta_pass_rate * 100) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if flow_option %}
   <div class="card">
     <h2>任务流程图 · 节点按 rubric 跨 case 平均得分着色</h2>

@@ -172,6 +172,16 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             except Exception:  # noqa: BLE001
                 pass
 
+        # 若有回归对比 JSON,加载并传给模板(T10 dashboard 集成)
+        reg_file = out_dir / f"regression_{task_id}.json"
+        regression: dict | None = None
+        if reg_file.exists():
+            try:
+                regression = json.loads(
+                    reg_file.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                pass
+
         page_file = f"task_{task_id}.html"
         html = env.get_template("task_page.html.j2").render(
             task_id=task_id,
@@ -179,6 +189,7 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             summary=summary,
             flow_option=flow_option,
             recommendations=recommendations,
+            regression=regression,
             rubric_meta=rubric_meta,
             persona_meta=persona_meta,
         )

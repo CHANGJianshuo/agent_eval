@@ -118,3 +118,76 @@ def test_build_dashboard_empty_results(tmp_path: Path):
     out = build_dashboard([], tmp_path / "out")
     html = out.read_text(encoding="utf-8")
     assert "还没有任何 result.json" in html
+
+
+def test_dashboard_renders_regression_card(tmp_path: Path):
+    """reports/regression_<task>.json 存在时,task_<task>.html 顶部含回归对比卡。"""
+    trace = tmp_path / "demo.jsonl"
+    _write_synthetic_trace(trace)
+    res = _result(str(trace))
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    # 写入合成 regression JSON
+    (out_dir / "regression_demo.json").write_text(json.dumps({
+        "task_id": "demo",
+        "old_label": "v1", "new_label": "v2-fixed",
+        "old_total": 5, "new_total": 5,
+        "old_pass_rate": 0.2, "new_pass_rate": 0.6,
+        "old_score_avg": 0.40, "new_score_avg": 0.75,
+        "by_dimension": [
+            ["completion", 0.40, 0.78, 0.38],
+            ["robustness", 0.55, 0.60, 0.05],
+            ["safety", 1.0, 1.0, 0.0],
+        ],
+        "by_rubric": [
+            {"rubric_id": "flow.step1", "dimension": "completion",
+             "old_avg": 0.30, "new_avg": 0.85, "delta": 0.55,
+             "significance": "improve", "old_n": 5, "new_n": 5},
+            {"rubric_id": "constraint.length",
+             "dimension": "robustness",
+             "old_avg": 0.70, "new_avg": 0.50, "delta": -0.20,
+             "significance": "regress", "old_n": 5, "new_n": 5},
+            {"rubric_id": "new.rule", "dimension": "completion",
+             "old_avg": None, "new_avg": 0.80, "delta": None,
+             "significance": "added", "old_n": 0, "new_n": 5},
+        ],
+        "by_persona": [
+            {"persona_id": "p1", "old_n": 5, "new_n": 5,
+             "old_pass_rate": 0.2, "new_pass_rate": 0.8,
+             "delta_pass_rate": 0.6,
+             "old_completion": 0.4, "new_completion": 0.8}
+        ],
+        "n_improvements": 2, "n_regressions": 1,
+        "threshold": 0.05,
+    }, ensure_ascii=False), encoding="utf-8")
+
+    build_dashboard([res], out_dir, task_names={"demo": "Demo"})
+
+    html = (out_dir / "task_demo.html").read_text(encoding="utf-8")
+    # 标题 + 元信息
+    assert "📊 回归对比" in html
+    assert "v1 → v2-fixed" in html
+    assert "2 改进" in html and "1 退化" in html
+    # 总览数字
+    assert "0.400" in html and "0.750" in html               # task_score
+    # 显著变化
+    assert "flow.step1" in html                              # 改进
+    assert "↑ 改进" in html
+    assert "constraint.length" in html                       # 退化
+    assert "↓ 退化" in html
+    assert "new.rule" in html                                # 新增
+    assert "+ 新增" in html
+
+
+def test_dashboard_skips_regression_card_when_no_json(tmp_path: Path):
+    """没有 regression_*.json 时,任务页不该出现回归对比卡。"""
+    trace = tmp_path / "demo.jsonl"
+    _write_synthetic_trace(trace)
+    res = _result(str(trace))
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    build_dashboard([res], out_dir, task_names={"demo": "Demo"})
+
+    html = (out_dir / "task_demo.html").read_text(encoding="utf-8")
+    assert "📊 回归对比" not in html
