@@ -394,6 +394,134 @@ def regression(task: str = typer.Option(..., help="任务 id 或目录"),
     typer.echo(f"\nJSON → {out_path}")
 
 
+@app.command("generate-task")
+def generate_task_cmd(
+        prompt: str = typer.Option(..., help="任务描述文件路径(.md/.txt)"),
+        id: str = typer.Option(..., "--id", help="新任务 id(目录名)"),
+        config: str = typer.Option(None)):
+    """从一段任务描述自动产出 task.yaml + flow.yaml + rubrics + personas + grader.py。
+
+    流程(每步会进度提示):
+    1. 抽业务变量(LLM low effort,~10s)
+    2. 抽 flow.yaml(LLM medium,~30s)
+    3. 抽 rubrics(LLM medium,~60s)
+    4. 抽 personas + 比例 + 覆盖率(LLM medium,~60s)
+    5. 生成 grader.py(模板填空,即时)
+    6. 写出全部文件到 tasks/<id>/
+
+    审核后 `claw-eval review --task <id>` 把 rubric 草稿转正。
+    """
+    import yaml as _yaml
+    from .models.rubric import save_rubrics
+    from .sampling import NoiseOverlay, SamplingConfig, save_sampling
+    from .task_gen.flow_extractor import extract_flow, save_flow
+    from .task_gen.grader_generator import save_grader
+    from .task_gen.variables_extractor import (
+        auto_detect_placeholders, extract_variables,
+    )
+    from .rubric.extractor import extract_rubrics
+    from .user_simulator.extractor import (
+        extract_personas_with_coverage, save_persona_script,
+    )
+
+    prompt_path = Path(prompt)
+    if not prompt_path.exists():
+        typer.echo(f"[error] 文件不存在:{prompt_path}")
+        raise typer.Exit(1)
+    task_prompt = prompt_path.read_text(encoding="utf-8")
+
+    task_id = id
+    task_dir = _ROOT / "tasks" / task_id
+    if task_dir.exists():
+        typer.echo(f"[error] tasks/{task_id}/ 已存在,先删除或换 id")
+        raise typer.Exit(1)
+    task_dir.mkdir(parents=True)
+    (task_dir / "personas").mkdir(exist_ok=True)
+    personas_draft_dir = task_dir / "personas_draft"
+    personas_draft_dir.mkdir(exist_ok=True)
+
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+    judge_model = cfg["judge"]["model"]
+    effort_low = "low"
+    effort_med = cfg["judge"].get("reasoning_effort", "medium")
+
+    typer.echo(f"\n═══ 生成任务 {task_id} ═══\n")
+
+    # ① 业务变量
+    typer.echo("① 抽业务变量(LLM low effort)…")
+    auto_vars = {k: f"<TODO {k}>" for k in auto_detect_placeholders(task_prompt)}
+    try:
+        llm_vars = extract_variables(task_prompt, judge_model, effort_low)
+    except Exception as exc:
+        typer.echo(f"   ⚠ LLM 变量抽取失败:{exc};仅保留 placeholder")
+        llm_vars = {}
+    variables = {**auto_vars, **llm_vars}
+    typer.echo(f"   ✓ {len(variables)} 个变量:{list(variables.keys())}")
+
+    # ② flow.yaml
+    typer.echo("\n② 抽 flow.yaml(LLM 中等 effort)…")
+    flow = extract_flow(task_prompt, judge_model, reasoning_effort=effort_med)
+    save_flow(flow, task_dir / "flow.yaml")
+    typer.echo(f"   ✓ {len(flow.nodes)} 个节点 + {len(flow.edges)} 条边")
+
+    # 写 task.yaml(prompt + variables)
+    task_yaml = {
+        "task_id": task_id,
+        "prompt": task_prompt,
+        "variables": variables,
+    }
+    (task_dir / "task.yaml").write_text(
+        _yaml.safe_dump(task_yaml, allow_unicode=True, sort_keys=False,
+                        default_flow_style=False),
+        encoding="utf-8")
+    typer.echo(f"   写出 task.yaml({len(task_prompt)} 字符)")
+
+    # ③ rubrics(草稿)
+    typer.echo("\n③ 抽 rubrics 草稿(LLM 中等 effort)…")
+    from .models.task import TaskDefinition
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    rubrics = extract_rubrics(task_def, judge_model, reasoning_effort=effort_med)
+    save_rubrics(rubrics, task_dir / "rubrics.draft.yaml", include_meta=True)
+    typer.echo(f"   ✓ {len(rubrics)} 条 rubric 草稿 → rubrics.draft.yaml")
+
+    # ④ personas + 比例(必须覆盖 flow 节点)
+    typer.echo("\n④ 抽 personas + 比例 + 覆盖率…")
+    flow_node_list = [(n.id, n.label) for n in flow.nodes]
+    pset = extract_personas_with_coverage(
+        task_def, judge_model, _ROOT / "personalities",
+        flow_node_list, reasoning_effort=effort_med)
+    for s in pset.scripts:
+        save_persona_script(s, personas_draft_dir / f"{s.id}.yaml")
+    typer.echo(f"   ✓ {len(pset.scripts)} 个 persona 草稿 → personas_draft/")
+
+    # sampling.yaml(草稿)
+    sampling = SamplingConfig(weights={k: v for k, v in pset.weights.items()},
+                                noise_overlay=NoiseOverlay())
+    save_sampling(sampling, task_dir / "sampling.yaml")
+    typer.echo(f"   写出 sampling.yaml(权重 {list(pset.weights.values())})")
+
+    # 覆盖检查
+    uncovered = [n for n, who in pset.coverage.items() if not who]
+    if uncovered:
+        typer.echo(f"   ⚠ 仍有 {len(uncovered)} 个 flow 节点无 persona 覆盖:{uncovered}")
+    else:
+        typer.echo("   ✓ 所有 flow 节点都有 persona 覆盖")
+
+    # ⑤ grader.py
+    typer.echo("\n⑤ 生成 grader.py(模板填空)…")
+    save_grader(task_id, task_dir / "grader.py")
+    typer.echo(f"   ✓ grader.py")
+
+    typer.echo(f"\n═══ 完成 ═══")
+    typer.echo(f"任务目录:tasks/{task_id}/")
+    typer.echo(f"下一步:")
+    typer.echo(f"  1. 审核草稿:tasks/{task_id}/rubrics.draft.yaml & personas_draft/")
+    typer.echo(f"  2. 转正 rubric:claw-eval review --task {task_id}")
+    typer.echo(f"  3. 复制 personas_draft/ 想要的 persona 到 personas/")
+    typer.echo(f"  4. 跑批:claw-eval batch --task {task_id} --total 30 --label v1")
+
+
 @app.command()
 def grade(trace: str = typer.Option(..., help="trace.jsonl 路径"),
           task: str = typer.Option(...),

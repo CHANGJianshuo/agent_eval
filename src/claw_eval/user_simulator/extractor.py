@@ -191,6 +191,120 @@ def extract_personas(task: TaskDefinition, judge_model: str,
     return parse_personas_output(response, {p.id for p in personalities})
 
 
+# ============== 阶段 2 新增:支持覆盖率 + 推荐权重 ==============
+
+class ExtractedPersonaSet:
+    """带 weights + coverage 的完整生成结果。"""
+    def __init__(self, scripts: list[PersonaScript],
+                 weights: dict[str, int],
+                 coverage: dict[str, list[str]]):
+        self.scripts = scripts
+        self.weights = weights              # persona_id → 推荐权重(int,任意正数)
+        self.coverage = coverage            # node_id → 覆盖它的 persona_ids
+
+
+_COVERAGE_SYSTEM_ADDON = """\
+
+## ★★ 额外要求(本次必须遵守)
+
+1. 每个 persona 必须显式声明 `covers_flow_nodes` 字段 —— 一个 flow 节点 id 列表,
+   表示该 persona 的剧本(states/probes)会触发哪些节点。
+2. 每个 persona 必须给一个 `weight` 字段(整数,任意正数),表示建议占比。
+   合理分布:合作型多(50-60),拒绝/抵触型 15-25,边界场景 5-15。
+3. **必须保证下方 flow 节点列表里的每个节点都被至少一个 persona 覆盖**。
+   覆盖判定:persona 的 probes 文本含相关关键词、或 states 的 instruction
+   明确包含该节点的行为。
+
+## 本任务的 flow 节点(必须覆盖)
+{flow_nodes_block}
+"""
+
+
+def build_prompt_with_coverage(task: TaskDefinition,
+                                personalities: list[Personality],
+                                flow_nodes: list[tuple[str, str]]) -> tuple[str, str]:
+    """flow_nodes: [(node_id, label), ...]。"""
+    pers_block = "\n".join(
+        f"- {p.id} ({p.name}) — {p.description}" for p in personalities)
+    facts = "\n".join(f"  {k} = {v}" for k, v in task.variables.items())
+    fn_block = "\n".join(f"- {nid}: {lbl}" for nid, lbl in flow_nodes)
+
+    system_base = _SYSTEM_PROMPT.replace("{personalities}", pers_block)
+    system = system_base + _COVERAGE_SYSTEM_ADDON.replace(
+        "{flow_nodes_block}", fn_block)
+    user = (
+        _USER_TEMPLATE
+        .replace("{facts}", facts or "  (无)")
+        .replace("{prompt}", task.prompt)
+    )
+    return system, user
+
+
+def parse_personas_with_coverage(text: str,
+                                   known_personalities: set[str],
+                                   flow_nodes: list[str]) -> ExtractedPersonaSet:
+    """解析输出:把 weight + covers_flow_nodes 抽出,scripts 不带 weight。"""
+    m = re.search(r"```(?:yaml)?\s*\n(.+?)```", text, re.DOTALL)
+    if m:
+        text = m.group(1)
+    data = yaml.safe_load(text)
+    if isinstance(data, dict) and "personas" in data:
+        data = data["personas"]
+    if not isinstance(data, list):
+        raise ValueError(f"LLM 返回不是 persona 列表(得到 {type(data).__name__})")
+
+    scripts: list[PersonaScript] = []
+    weights: dict[str, int] = {}
+    coverage_inv: dict[str, list[str]] = {n: [] for n in flow_nodes}
+
+    for i, item in enumerate(data):
+        if not isinstance(item, dict):
+            continue
+        # 把 weight 抽出,covers_flow_nodes 留在 item(PersonaScript 模型支持)
+        w = int(item.pop("weight", 10))
+        try:
+            script = PersonaScript.model_validate(item)
+        except Exception as exc:
+            raise ValueError(f"第 {i + 1} 个 persona 格式不合法:{exc}") from exc
+        if script.personality not in known_personalities:
+            raise ValueError(
+                f"persona '{script.id}' 引用了未知性格 '{script.personality}'")
+        scripts.append(script)
+        weights[script.id] = max(1, w)
+        for nid in script.covers_flow_nodes:
+            if nid in coverage_inv:
+                coverage_inv[nid].append(script.id)
+
+    return ExtractedPersonaSet(scripts, weights, coverage_inv)
+
+
+def extract_personas_with_coverage(
+        task: TaskDefinition, judge_model: str,
+        personalities_dir: str | Path,
+        flow_nodes: list[tuple[str, str]],
+        reasoning_effort: str = "medium",
+        temperature: float = 0.0) -> ExtractedPersonaSet:
+    """阶段 2 用 —— 生成 persona 时附带 weight + covers_flow_nodes。
+
+    flow_nodes: [(node_id, label), ...]
+    """
+    personalities = list_personality_library(personalities_dir)
+    system, user = build_prompt_with_coverage(task, personalities, flow_nodes)
+    response = llm_client.chat(
+        judge_model,
+        [{"role": "system", "content": system},
+         {"role": "user", "content": user}],
+        temperature=temperature,
+        reasoning_effort=reasoning_effort,
+        max_tokens=12000,
+    )
+    return parse_personas_with_coverage(
+        response,
+        {p.id for p in personalities},
+        [nid for nid, _ in flow_nodes],
+    )
+
+
 def save_persona_script(script: PersonaScript, path: str | Path) -> None:
     """剧本 → 可读 YAML(YAML 格式与编辑器的输出一致)。"""
     data = script.model_dump(exclude_none=True)
