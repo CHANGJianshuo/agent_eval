@@ -282,6 +282,56 @@ def dashboard(traces_dir: str = typer.Option(None),
     typer.echo(f"Dashboard: {out}")
 
 
+@app.command()
+def recommend(task: str = typer.Option(..., help="任务 id 或目录"),
+              top: int = typer.Option(5, help="给出最弱的 N 条建议"),
+              config: str = typer.Option(None),
+              no_judge: bool = typer.Option(
+                  False, help="只产聚合数据,不调 LLM 生成修改建议")):
+    """分析评测结果产改进建议:找最弱 rubric + LLM 给「改 Prompt 哪几句」。
+
+    输出 reports/recommendations_<task_id>.json,下次 dashboard 会自动显示。
+    """
+    from .models.rubric import load_rubrics
+    from .report.aggregate import load_results_dir
+    from .report.recommend import build_recommendations, save_recommendations
+
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    rubrics = load_rubrics(task_dir / "rubrics.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+
+    results = [r for r in load_results_dir(_ROOT / "traces")
+               if r.task_id == task_def.task_id]
+    if not results:
+        typer.echo(f"[error] traces/ 下没有 {task_def.task_id} 的 result.json")
+        typer.echo(f"  请先跑 claw-eval batch --task {task} 产生评测结果")
+        raise typer.Exit(1)
+
+    judge_model = None if no_judge else cfg["judge"]["model"]
+    typer.echo(f"分析 {len(results)} 个 result,找最弱 rubric…")
+    if judge_model:
+        typer.echo(f"将用 {judge_model} 生成可执行建议(可能 30-60s)")
+    recs = build_recommendations(
+        task_def, results, rubrics,
+        judge_model=judge_model, top_n=top,
+        reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+
+    if not recs:
+        typer.echo("✓ 没有明显弱的 rubric(全部 ≥0.8 或触发次数 <3)")
+        return
+
+    out_path = _ROOT / "reports" / f"recommendations_{task_def.task_id}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    save_recommendations(task_def.task_id, recs, out_path)
+    typer.echo(f"\n✓ {len(recs)} 条建议 → {out_path.name}")
+    for i, r in enumerate(recs, 1):
+        typer.echo(f"  [{i}] {r['rubric_id']:<32} "
+                   f"avg={r['avg_score']:.2f}  severity={r['severity']:.2f}")
+    typer.echo(f"\n  下一步:claw-eval dashboard 重生成报告,顶部会显示建议")
+
+
 @app.command("extract-rubric")
 def extract_rubric_cmd(
         task: str = typer.Option(..., help="任务 id 或目录"),

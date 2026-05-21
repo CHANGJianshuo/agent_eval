@@ -137,12 +137,24 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             build_case_report(r, cases_dir / f"{stem}.html", task_dir=task_dir)
             run["report_link"] = f"cases/{stem}.html"
 
+        # 若有改进建议文件,加载并传给模板
+        rec_file = out_dir / f"recommendations_{task_id}.json"
+        recommendations: list[dict] = []
+        if rec_file.exists():
+            try:
+                recommendations = json.loads(
+                    rec_file.read_text(encoding="utf-8")
+                ).get("recommendations", [])
+            except Exception:  # noqa: BLE001
+                pass
+
         page_file = f"task_{task_id}.html"
         html = env.get_template("task_page.html.j2").render(
             task_id=task_id,
             task_name=task_names.get(task_id, task_id),
             summary=summary,
             flow_option=flow_option,
+            recommendations=recommendations,
         )
         (out_dir / page_file).write_text(html, encoding="utf-8")
 
