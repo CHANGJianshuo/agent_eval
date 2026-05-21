@@ -17,6 +17,16 @@ import yaml
 from pydantic import BaseModel, Field
 
 
+class Demographics(BaseModel):
+    """人口学特征 —— 任务无关,作为性格底色的一部分。"""
+
+    mbti: str = "unspecified"            # 16 类 + unspecified
+    age_range: str = "unspecified"       # <20 / 20-29 / 30-39 / 40-49 / 50+ / unspecified
+    gender: str = "unspecified"          # male / female / unspecified
+    education: str = "unspecified"       # primary / middle / high / college / postgrad / unspecified
+    attitude: str = "unspecified"        # 7 类情绪态度 + unspecified
+
+
 class Personality(BaseModel):
     """性格底色 —— 任务无关,决定语气/用词,可跨任务复用。"""
 
@@ -24,6 +34,7 @@ class Personality(BaseModel):
     name: str
     description: str
     speaking_style: str
+    demographics: Demographics = Field(default_factory=Demographics)
 
 
 class NoiseKind(BaseModel):
@@ -65,6 +76,7 @@ class PersonaScript(BaseModel):
     transitions: dict[str, str | dict[str, float]]
     probes: list[ProbeConfig] = Field(default_factory=list)
     max_rounds: int = 12
+    covers_flow_nodes: list[str] = Field(default_factory=list)   # 该剧本声明能触发哪些 flow 节点
 
 
 class Persona(BaseModel):
@@ -76,6 +88,7 @@ class Persona(BaseModel):
     personality_id: str
     description: str
     speaking_style: str
+    demographics: Demographics = Field(default_factory=Demographics)
     # —— 来自噪音层(rate 版)——
     noise_rate: float = 0.0
     noise_kinds: list[NoiseKind] = Field(default_factory=list)
@@ -85,6 +98,7 @@ class Persona(BaseModel):
     transitions: dict[str, str | dict[str, float]]
     probes: list[ProbeConfig] = Field(default_factory=list)
     max_rounds: int = 12
+    covers_flow_nodes: list[str] = Field(default_factory=list)
 
 
 def load_personality(path: str | Path) -> Personality:
@@ -126,6 +140,7 @@ def load_persona(script_path: str | Path,
         personality_id=personality.id,
         description=personality.description,
         speaking_style=personality.speaking_style,
+        demographics=personality.demographics,            # 性格层带的人口学,直接传入运行时
         noise_rate=script.noise.rate,
         noise_kinds=noise_kinds,
         states=script.states,
@@ -133,4 +148,5 @@ def load_persona(script_path: str | Path,
         transitions=script.transitions,
         probes=script.probes,
         max_rounds=script.max_rounds,
+        covers_flow_nodes=script.covers_flow_nodes,        # 剧本声明覆盖的 flow 节点
     )

@@ -7,6 +7,7 @@ import streamlit.components.v1 as components
 from claw_eval.editor._utils import REPORTS_DIR, list_tasks
 
 st.set_page_config(page_title="报告查看", page_icon="📊", layout="wide")
+inject_global_style()
 st.title("📊 报告查看")
 st.caption("嵌入查看 dashboard 多页 HTML。先 `claw-eval dashboard` 或在「跑批评测」页跑批,这里就有内容。")
 

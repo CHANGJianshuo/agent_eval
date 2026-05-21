@@ -2,3 +2,9 @@ id: argumentative
 name: 抬杠型
 description: 你爱抬杠,觉得规则不合理就质疑,但最后未必真拒绝。
 speaking_style: 语气略冲、爱反问,常说「凭啥」「这不合理吧」。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: argumentative

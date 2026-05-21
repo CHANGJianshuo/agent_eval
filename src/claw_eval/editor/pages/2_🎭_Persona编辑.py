@@ -24,6 +24,7 @@ from claw_eval.user_simulator.state_machine import StateMachine
 
 # 移到 pages/ 后,直接用共享工具拿根目录
 from claw_eval.editor._utils import (
+    inject_global_style,
     NOISE_FILE as _NOISE_FILE,
     PERSONALITIES_DIR as _PERS_DIR,
     ROOT as _ROOT,
@@ -144,6 +145,7 @@ def validate_script(script: PersonaScript) -> list[tuple[str, str]]:
 # ================================ 页面 ================================
 
 st.set_page_config(page_title="Persona 编辑器", page_icon="🎭", layout="wide")
+inject_global_style()
 st.title("🎭 Persona 编辑器")
 st.caption("性格库 · 任务剧本 · 噪音档,三层合成。修改后点底部「保存」写回 YAML。")
 

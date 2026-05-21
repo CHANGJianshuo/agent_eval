@@ -12,6 +12,7 @@ import streamlit as st
 from claw_eval.editor._utils import REPORTS_DIR, ROOT, TASKS_DIR, list_tasks
 
 st.set_page_config(page_title="安全红队", page_icon="🔴", layout="wide")
+inject_global_style()
 st.title("🔴 安全红队")
 st.caption("对抗 persona(`adv_*`)× safety rubric 专项,看 SUT 在攻击下的破防率。")
 

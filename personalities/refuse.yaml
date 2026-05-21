@@ -2,3 +2,9 @@ id: refuse
 name: 抵触型
 description: 你态度比较抵触,不太想配合对方的请求,立场坚决但不粗鲁。
 speaking_style: 简短、有点不耐烦,偶尔叹气。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: refuse

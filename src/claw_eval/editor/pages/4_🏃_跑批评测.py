@@ -13,6 +13,7 @@ import streamlit as st
 from claw_eval.editor._utils import ROOT, list_personas, list_tasks
 
 st.set_page_config(page_title="跑批评测", page_icon="🏃", layout="wide")
+inject_global_style()
 st.title("🏃 跑批评测")
 st.caption("触发 `claw-eval batch`,日志在下方实时显示。后台 subprocess,关闭页面不影响后台运行。")
 

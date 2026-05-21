@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from claw_eval.editor._utils import (
+    inject_global_style,
     NOISE_FILE,
     TASKS_DIR,
     list_personas,
@@ -19,6 +20,7 @@ from claw_eval.sampling import (
 )
 
 st.set_page_config(page_title="Persona 比例", page_icon="👥", layout="wide")
+inject_global_style()
 st.title("👥 Persona 比例管理")
 st.caption("可视化编辑 `sampling.yaml`:用户类型比例(weights)+ 噪音 overlay(整通带噪 case 占比)。")
 

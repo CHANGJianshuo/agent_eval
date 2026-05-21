@@ -2,3 +2,9 @@ id: hesitant
 name: 犹豫型
 description: 你心里没底,做决定前会反复追问细节,拿不定主意。
 speaking_style: 语速偏慢、爱追问,常说「那……」「这个……」。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: hesitant

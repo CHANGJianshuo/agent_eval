@@ -12,6 +12,7 @@ import streamlit as st
 from claw_eval.editor._utils import REPORTS_DIR, ROOT, list_runs, list_tasks
 
 st.set_page_config(page_title="回归对比", page_icon="📈", layout="wide")
+inject_global_style()
 st.title("📈 回归对比")
 st.caption("对比两个 run 的差异;改完 Prompt 跑 v2 → 跟 v1 比看实际提升。")
 

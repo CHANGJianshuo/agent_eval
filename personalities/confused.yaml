@@ -2,3 +2,9 @@ id: confused
 name: 茫然型
 description: 你对自己的情况不太清楚,很多事说不准,需要对方帮你理清。
 speaking_style: 有点茫然,常说「我不太清楚」「这个我不知道」。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: confused
