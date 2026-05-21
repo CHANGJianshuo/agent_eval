@@ -180,7 +180,7 @@ claw_eval/
 │   ├── noise_profiles.yaml         # 噪音种类库(filler / asr_error / broken / interrupt)
 │   └── adversarial_probes.yaml     # 对抗话术库(注入 / 社工 / 施压)
 │
-├── tests/                          # 16 个测试文件,192 个测试
+├── tests/                          # 17 个测试文件,192 个测试
 └── reports/                        # HTML 报告 + recommendations / regression / safety_test JSON
 ```
 
@@ -212,7 +212,7 @@ claw_eval/
 192 单元测试全绿     · 0.4 秒跑完     · 无 API 依赖
 12 git commit       · 已推 GitHub    · MIT 风格(待补 LICENSE)
 2 任务  / 16 persona / 33 rubric  / 10 性格 / 8+1 matcher
-13 CLI 命令        · 16 测试文件
+13 CLI 命令        · 17 测试文件
 ```
 
 剩余工作见 [CLAUDE.md 待完成清单](CLAUDE.md#待完成任务清单);其中 T6(meta-eval)和 T12(线上 KPI)等业务方数据。

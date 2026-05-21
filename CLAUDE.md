@@ -56,7 +56,7 @@
   - `tasks/<id>/` 每任务一个目录(task.yaml + rubrics.yaml + sampling.yaml + flow.yaml + grader.py + personas/)
   - `personalities/` 10 个共享性格(7 常规 + 3 对抗,前缀 `adv_`)
   - `configs/`:noise_profiles.yaml + adversarial_probes.yaml + models.yaml
-  - `tests/` 16 个测试文件,192 个测试,0.4 秒跑完
+  - `tests/` 17 个测试文件,192 个测试,0.4 秒跑完
   - `reports/` 多页 HTML 产物(index + task 详情 + cases + recommendations + regression JSON)
 - **当前数据规模**:**2 任务 / 16 persona(美团 8 + 直播 8,含各 2 个对抗) / 33 rubric / 8 类 matcher + LLM Judge / 7 类 rubric 分类**。
 - **13 个 CLI 命令**:`run / batch / grade / report / dashboard / validate / extract-rubric / extract-personas / review / pipeline / recommend / regression / safety-test / editor`。
