@@ -1,0 +1,9 @@
+# 课程发布平台直播升级外呼 · 真实流量分布权重(占比可自行调整)
+# 用法:claw-eval batch --task live_upgrade --total 100
+weights:
+  cooperative_owner:  45     # 配合负责人是主流
+  invisible_channel:  20     # 第三方系统未显示选项较常见
+  busy_owner:         10
+  discount_seeker:    10
+  driving:             5
+  non_owner:          10

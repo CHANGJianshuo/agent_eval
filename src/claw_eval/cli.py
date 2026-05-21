@@ -153,13 +153,20 @@ def run(task: str = typer.Option(..., help="任务 id 或目录"),
 def batch(task: str = typer.Option(..., help="任务 id 或目录"),
           personas: str = typer.Option(
               "", help="逗号分隔的 persona;留空 = 全部"),
-          trials: int = typer.Option(1),
+          trials: int = typer.Option(1, help="每 persona 跑几次(uniform 模式)"),
+          total: int = typer.Option(
+              0, help="≥1 时按 sampling.yaml 比例分配 total 个 trial(否则用 --trials uniform)"),
           config: str = typer.Option(None),
           no_judge: bool = typer.Option(False),
           concurrency: int = typer.Option(
               0, help="并发对话数;0 = 用配置文件的默认"),
           dashboard_out: bool = typer.Option(True)):
-    """对一个任务跑「多 persona × N trials」,case 间并行;跑完自动出 dashboard。"""
+    """跑「多 persona × N trials」,case 间并行;跑完自动出 dashboard。
+
+    两种模式:
+      uniform:   `--trials 3` —— 每个 persona 跑 3 次
+      比例分配:  `--total 100` —— 按 sampling.yaml 权重把 100 个 trial 分给各 persona
+    """
     task_dir = _task_dir(task)
     task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
     rubrics = load_rubrics(task_dir / "rubrics.yaml")
@@ -167,15 +174,33 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
     _configure_provider(cfg)
     judge = None if no_judge else _make_judge(cfg)
 
-    if personas:
-        names = [p.strip() for p in personas.split(",") if p.strip()]
-    else:
-        names = sorted(p.stem for p in (task_dir / "personas").glob("*.yaml"))
-
     n_workers = concurrency or int(cfg.get("concurrency", 4))
-    pairs = [(name, i) for name in names for i in range(trials)]
-    typer.echo(f"[batch] {task_def.task_id}: {len(names)} persona × {trials} trials "
-               f"= {len(pairs)} 次,并发 {n_workers}")
+
+    if total > 0:
+        # 比例分配模式
+        from .sampling import allocate, load_sampling
+        samp_file = task_dir / "sampling.yaml"
+        if not samp_file.exists():
+            typer.echo(f"[error] --total 模式需要 {samp_file}")
+            raise typer.Exit(1)
+        weights = load_sampling(samp_file).weights
+        if personas:
+            picked = {p.strip() for p in personas.split(",") if p.strip()}
+            weights = {k: v for k, v in weights.items() if k in picked}
+        alloc = {k: n for k, n in allocate(weights, total).items() if n > 0}
+        pairs = [(name, i) for name, n in alloc.items() for i in range(n)]
+        dist = ", ".join(f"{k}×{v}" for k, v in alloc.items())
+        typer.echo(f"[batch · 比例分配] {task_def.task_id}: total={total} → "
+                   f"{dist},并发 {n_workers}")
+    else:
+        # uniform 模式
+        if personas:
+            names = [p.strip() for p in personas.split(",") if p.strip()]
+        else:
+            names = sorted(p.stem for p in (task_dir / "personas").glob("*.yaml"))
+        pairs = [(name, i) for name in names for i in range(trials)]
+        typer.echo(f"[batch · uniform] {task_def.task_id}: {len(names)} persona × "
+                   f"{trials} trials = {len(pairs)} 次,并发 {n_workers}")
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     by_persona: dict[str, list[float]] = {name: [] for name in names}
@@ -255,6 +280,32 @@ def dashboard(traces_dir: str = typer.Option(None),
     od = Path(out_dir) if out_dir else _ROOT / "reports"
     out = build_dashboard_from_dir(td, od)
     typer.echo(f"Dashboard: {out}")
+
+
+@app.command()
+def validate(task: str = typer.Option(..., help="任务 id 或目录")):
+    """对任务做一致性检查 —— 命名 / safety 标记 / trigger 可达性 / 状态机终止 / sampling。"""
+    from .validator import validate_task
+    task_dir = _task_dir(task)
+    rep = validate_task(
+        task_dir,
+        personalities_dir=_ROOT / "personalities",
+        noise_file=_ROOT / "configs" / "noise_profiles.yaml",
+        sampling_file=task_dir / "sampling.yaml",
+    )
+    typer.echo(f"\n=== 校验任务 {rep.task_id} ===")
+    icons = {"error": "✗", "warning": "⚠", "info": "·"}
+    for level in ("error", "warning", "info"):
+        for it in [i for i in rep.issues if i.level == level]:
+            typer.echo(f"  {icons[level]} [{it.code}] {it.message}")
+    if rep.ok:
+        if rep.warnings:
+            typer.echo(f"\n✓ 通过({len(rep.warnings)} 警告,无错误)")
+        else:
+            typer.echo("\n✓ 通过 —— 无问题")
+    else:
+        typer.echo(f"\n✗ 校验失败:{len(rep.errors)} 错误")
+        raise typer.Exit(1)
 
 
 def main() -> None:
