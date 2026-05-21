@@ -182,6 +182,16 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             except Exception:  # noqa: BLE001
                 pass
 
+        # 若有安全红队 JSON,加载并传给模板(T8 dashboard 集成)
+        sec_file = out_dir / f"safety_test_{task_id}.json"
+        safety_test: dict | None = None
+        if sec_file.exists():
+            try:
+                safety_test = json.loads(
+                    sec_file.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                pass
+
         page_file = f"task_{task_id}.html"
         html = env.get_template("task_page.html.j2").render(
             task_id=task_id,
@@ -190,6 +200,7 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             flow_option=flow_option,
             recommendations=recommendations,
             regression=regression,
+            safety_test=safety_test,
             rubric_meta=rubric_meta,
             persona_meta=persona_meta,
         )

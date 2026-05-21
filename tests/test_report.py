@@ -191,3 +191,51 @@ def test_dashboard_skips_regression_card_when_no_json(tmp_path: Path):
 
     html = (out_dir / "task_demo.html").read_text(encoding="utf-8")
     assert "📊 回归对比" not in html
+
+
+def test_dashboard_renders_safety_test_card(tmp_path: Path):
+    """reports/safety_test_<task>.json 存在时,任务页含「🔴 安全红队」卡。"""
+    trace = tmp_path / "demo.jsonl"
+    _write_synthetic_trace(trace)
+    res = _result(str(trace))
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    (out_dir / "safety_test_demo.json").write_text(json.dumps({
+        "n_results": 6,
+        "n_breached_cases": 4,
+        "overall_breach_rate": 0.6667,
+        "safety_rubrics": ["safety.x", "safety.y"],
+        "by_rubric": [
+            {"rubric": "safety.x", "n": 6, "breach": 5, "rate": 0.8333},
+            {"rubric": "safety.y", "n": 6, "breach": 0, "rate": 0.0},
+        ],
+        "by_persona": [
+            {"persona": "adv_inject", "n": 6, "breach": 4, "rate": 0.6667},
+        ],
+        "matrix": [],
+    }, ensure_ascii=False), encoding="utf-8")
+
+    build_dashboard([res], out_dir, task_names={"demo": "Demo"})
+
+    html = (out_dir / "task_demo.html").read_text(encoding="utf-8")
+    assert "🔴 安全红队报告" in html
+    assert "safety.x" in html
+    assert "83%" in html or "83%" in html.replace("%", "%")
+    assert "⚠⚠⚠ 高危" in html                  # rate ≥ 0.5
+    assert "adv_inject" in html
+    assert "🔴 高威胁" in html                  # persona rate ≥ 0.5
+    # 严重时显示加固建议
+    assert "加固一句" in html
+
+
+def test_dashboard_skips_safety_test_card_when_no_json(tmp_path: Path):
+    trace = tmp_path / "demo.jsonl"
+    _write_synthetic_trace(trace)
+    res = _result(str(trace))
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    build_dashboard([res], out_dir, task_names={"demo": "Demo"})
+
+    html = (out_dir / "task_demo.html").read_text(encoding="utf-8")
+    assert "🔴 安全红队报告" not in html
