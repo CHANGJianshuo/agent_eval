@@ -282,6 +282,83 @@ def dashboard(traces_dir: str = typer.Option(None),
     typer.echo(f"Dashboard: {out}")
 
 
+@app.command("extract-rubric")
+def extract_rubric_cmd(
+        task: str = typer.Option(..., help="任务 id 或目录"),
+        out: str = typer.Option("rubrics.draft.yaml",
+                                help="草稿输出文件(相对 task 目录)"),
+        config: str = typer.Option(None)):
+    """从任务 Prompt 自动产 rubric YAML 草稿(LLM 抽取,带 category/confidence)。
+
+    流程:extract-rubric → 写 rubrics.draft.yaml → claw-eval review 逐条人审转正。
+    """
+    from .models.rubric import save_rubrics
+    from .rubric.extractor import extract_rubrics
+
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+    judge_model = cfg["judge"]["model"]
+
+    typer.echo(f"调 LLM 抽取 rubric({judge_model})…")
+    rubrics = extract_rubrics(
+        task_def, judge_model,
+        reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+
+    out_path = task_dir / out
+    save_rubrics(rubrics, out_path, include_meta=True)
+    typer.echo(f"✓ 写出 {len(rubrics)} 条草稿 → {out_path}")
+    typer.echo(f"  下一步:claw-eval review --task {task}")
+
+
+@app.command()
+def review(task: str = typer.Option(..., help="任务 id 或目录"),
+           draft: str = typer.Option("rubrics.draft.yaml",
+                                     help="草稿文件(相对 task 目录)")):
+    """逐条人审 rubric 草稿,通过后转正为 rubrics.yaml。
+
+    safety 类必须显式 accept/reject,不可跳过。
+    """
+    from .models.rubric import load_rubrics, save_rubrics
+    from .rubric.reviewer import (
+        apply_decisions, gate_blocked, interactive_review, summarize_state,
+    )
+
+    task_dir = _task_dir(task)
+    draft_path = task_dir / draft
+    if not draft_path.exists():
+        typer.echo(f"[error] 草稿不存在:{draft_path}")
+        typer.echo(f"  请先运行:claw-eval extract-rubric --task {task}")
+        raise typer.Exit(1)
+
+    drafts = load_rubrics(draft_path)
+    typer.echo(f"=== 审核 {draft_path}({len(drafts)} 条)===")
+
+    state = interactive_review(drafts)
+
+    blocked = gate_blocked(state)
+    if blocked:
+        typer.echo(f"\n✗ 仍有 safety 类未审:{blocked}")
+        raise typer.Exit(1)
+    typer.echo(f"\n汇总:{summarize_state(state)}")
+
+    final = apply_decisions(state)
+    confirm = typer.prompt(f"\n将写入 {len(final)} 条到 rubrics.yaml,确认? (y/n)",
+                           default="y").strip().lower()
+    if confirm != "y":
+        typer.echo("已取消")
+        raise typer.Exit(0)
+
+    target = task_dir / "rubrics.yaml"
+    if target.exists():
+        backup = task_dir / "rubrics.yaml.bak"
+        target.replace(backup)
+        typer.echo(f"  旧 rubrics.yaml 备份到 {backup}")
+    save_rubrics(final, target, include_meta=False)
+    typer.echo(f"✓ 已写入 {target}")
+
+
 @app.command()
 def editor(port: int = typer.Option(8501, help="Streamlit 端口")):
     """启动 Persona 编辑器(Streamlit 网页)—— 选性格、画状态机、配 noise、保存 YAML。
