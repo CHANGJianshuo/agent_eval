@@ -83,16 +83,29 @@ def _echo_result(result, prefix: str = "") -> None:
 
 def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
                    persona_name: str, trial_idx: int, total_trials: int,
-                   cfg: dict, judge, run_id: str) -> float:
+                   cfg: dict, judge, run_id: str,
+                   noise_overlay_kinds: list = None) -> float:
     """跑一个 trial(线程安全:每个 trial 各自的 trace 路径)。
 
     输出落到 traces/<run_id>/ 子目录,便于按 run 分组回归对比。
+
+    noise_overlay_kinds: 若非 None,本 trial 为「噪音 case」,临时把 persona 的
+                        noise_rate 强制为 1.0,kinds 用 overlay 配置(每轮必加噪)。
     """
     persona_obj = load_persona(
         task_dir / "personas" / f"{persona_name}.yaml",
         personalities_dir=_ROOT / "personalities",
         noise_file=_ROOT / "configs" / "noise_profiles.yaml",
     )
+    if noise_overlay_kinds:
+        # 这通是「噪音 case」:全程必噪(rate=1.0),kinds 用 overlay 指定的
+        from .models.persona import load_noise_kinds
+        all_kinds = load_noise_kinds(_ROOT / "configs" / "noise_profiles.yaml")
+        chosen = [all_kinds[k] for k in noise_overlay_kinds if k in all_kinds]
+        persona_obj = persona_obj.model_copy(update={
+            "noise_rate": 1.0,
+            "noise_kinds": chosen,
+        })
     trace_path = (
         _ROOT / "traces" / run_id
         / f"{task_def.task_id}_{persona_name}_t{trial_idx + 1}.jsonl"
@@ -184,14 +197,16 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
 
     n_workers = concurrency or int(cfg.get("concurrency", 4))
 
+    noise_overlay_for_idx: dict[int, list] = {}
     if total > 0:
         # 比例分配模式
-        from .sampling import allocate, load_sampling
+        from .sampling import allocate, load_sampling, select_noise_cases
         samp_file = task_dir / "sampling.yaml"
         if not samp_file.exists():
             typer.echo(f"[error] --total 模式需要 {samp_file}")
             raise typer.Exit(1)
-        weights = load_sampling(samp_file).weights
+        sampling_cfg = load_sampling(samp_file)
+        weights = sampling_cfg.weights
         if personas:
             picked = {p.strip() for p in personas.split(",") if p.strip()}
             weights = {k: v for k, v in weights.items() if k in picked}
@@ -201,6 +216,17 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
         dist = ", ".join(f"{k}×{v}" for k, v in alloc.items())
         typer.echo(f"[batch · 比例分配] {task_def.task_id}: total={total} → "
                    f"{dist},并发 {n_workers}")
+
+        # 噪音 overlay:选出 round(N × rate) 个噪音 case
+        ov = sampling_cfg.noise_overlay
+        if ov.rate > 0 and ov.kinds:
+            noise_idx_set = select_noise_cases(
+                len(pairs), ov.rate,
+                seed=abs(hash(label or "")) & 0xFFFFFFFF)
+            for i in noise_idx_set:
+                noise_overlay_for_idx[i] = ov.kinds
+            typer.echo(f"  噪音 overlay: rate={ov.rate} kinds={ov.kinds} "
+                       f"→ {len(noise_idx_set)}/{len(pairs)} 个噪音 case")
     else:
         # uniform 模式
         if personas:
