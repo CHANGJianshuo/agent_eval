@@ -359,6 +359,170 @@ def review(task: str = typer.Option(..., help="任务 id 或目录"),
     typer.echo(f"✓ 已写入 {target}")
 
 
+@app.command("extract-personas")
+def extract_personas_cmd(
+        task: str = typer.Option(..., help="任务 id 或目录"),
+        out_dir: str = typer.Option("personas_draft",
+                                    help="输出目录(相对 task 目录)"),
+        config: str = typer.Option(None)):
+    """从任务 Prompt 自动产 persona 剧本草稿(LLM 推荐 5-8 个 persona)。
+
+    保存到 tasks/<task>/personas_draft/<id>.yaml,人工挑选后复制 / 编辑后写入 personas/。
+    """
+    from .user_simulator.extractor import extract_personas, save_persona_script
+
+    task_dir = _task_dir(task)
+    task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+
+    typer.echo(f"调 LLM 抽取 persona({cfg['judge']['model']})…")
+    scripts = extract_personas(
+        task_def, cfg["judge"]["model"], _ROOT / "personalities",
+        reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+
+    out_path = task_dir / out_dir
+    out_path.mkdir(parents=True, exist_ok=True)
+    for s in scripts:
+        save_persona_script(s, out_path / f"{s.id}.yaml")
+    typer.echo(f"✓ 写出 {len(scripts)} 个 persona 草稿 → {out_path}/")
+    typer.echo("  人工挑选后,把要的复制 / 编辑后写到 tasks/<task>/personas/")
+
+
+@app.command()
+def pipeline(task: str = typer.Option(..., help="任务 id 或目录"),
+             from_step: int = typer.Option(1, "--from",
+                                            help="从第几步开始(1-6)"),
+             total: int = typer.Option(30,
+                                        help="第 5 步 batch 跑多少 trial"),
+             config: str = typer.Option(None),
+             no_judge: bool = typer.Option(False)):
+    """全流程编排:6 步显式 pipeline,关键节点人审 gate,不黑盒。
+
+    1. extract-rubric    → tasks/<task>/rubrics.draft.yaml
+    2. extract-personas  → tasks/<task>/personas_draft/*.yaml
+    3. validate          → 一致性检查(命名/safety/触发可达)
+    4. review            → 终端逐条审 rubric 草稿(safety 必审),转正 rubrics.yaml
+    5. batch --total N   → 比例分配跑评测
+    6. dashboard         → 出多页可视化
+
+    任一步失败,修后 `--from <step>` 续跑。
+    """
+    from .models.rubric import load_rubrics, save_rubrics
+    from .report.builder import build_dashboard_from_dir
+    from .rubric.extractor import extract_rubrics
+    from .rubric.reviewer import (
+        apply_decisions, gate_blocked, interactive_review, summarize_state,
+    )
+    from .user_simulator.extractor import (
+        extract_personas, save_persona_script,
+    )
+    from .validator import validate_task
+
+    task_dir = _task_dir(task)
+    cfg = _load_models_cfg(config)
+    _configure_provider(cfg)
+
+    steps = ["extract-rubric", "extract-personas", "validate",
+             "review", "batch", "dashboard"]
+
+    typer.echo(f"\n═════ claw-eval pipeline · {task} ═════")
+    typer.echo("6 步:" + " → ".join(steps))
+    typer.echo(f"从第 {from_step} 步开始")
+
+    def hdr(i: int, name: str) -> None:
+        typer.echo(f"\n──── [{i}/6] {name} ────")
+
+    # 1. extract-rubric
+    if from_step <= 1:
+        hdr(1, "extract-rubric(LLM 抽 rubric → 草稿)")
+        task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+        rubrics = extract_rubrics(
+            task_def, cfg["judge"]["model"],
+            reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+        save_rubrics(rubrics, task_dir / "rubrics.draft.yaml",
+                     include_meta=True)
+        typer.echo(f"✓ {len(rubrics)} 条 → rubrics.draft.yaml")
+
+    # 2. extract-personas
+    if from_step <= 2:
+        hdr(2, "extract-personas(LLM 推荐 persona 剧本 → 草稿)")
+        task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
+        scripts = extract_personas(
+            task_def, cfg["judge"]["model"], _ROOT / "personalities",
+            reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+        out = task_dir / "personas_draft"
+        out.mkdir(parents=True, exist_ok=True)
+        for s in scripts:
+            save_persona_script(s, out / f"{s.id}.yaml")
+        typer.echo(f"✓ {len(scripts)} 个 → personas_draft/")
+
+    # 3. validate
+    if from_step <= 3:
+        hdr(3, "validate(命名 / safety / 触发可达性 / 状态机终止)")
+        rep = validate_task(
+            task_dir,
+            personalities_dir=_ROOT / "personalities",
+            noise_file=_ROOT / "configs" / "noise_profiles.yaml",
+            sampling_file=task_dir / "sampling.yaml",
+        )
+        icons = {"error": "✗", "warning": "⚠", "info": "·"}
+        for it in rep.issues:
+            typer.echo(f"  {icons[it.level]} [{it.code}] {it.message}")
+        if not rep.ok:
+            typer.echo(f"✗ validate 有 {len(rep.errors)} 错误,修复后用 --from 3 续跑")
+            raise typer.Exit(1)
+        typer.echo("✓ 通过")
+
+    # 4. review (rubric 人审 gate)
+    if from_step <= 4:
+        hdr(4, "review(逐条人审 rubric 草稿,safety 必审,通过后转正)")
+        draft = task_dir / "rubrics.draft.yaml"
+        if not draft.exists():
+            typer.echo(f"✗ 草稿不存在 {draft},--from 1 重抽")
+            raise typer.Exit(1)
+        drafts = load_rubrics(draft)
+        state = interactive_review(drafts)
+        blocked = gate_blocked(state)
+        if blocked:
+            typer.echo(f"✗ safety 类未审:{blocked}")
+            raise typer.Exit(1)
+        final = apply_decisions(state)
+        typer.echo(f"\n{summarize_state(state)},将写 {len(final)} 条")
+        target = task_dir / "rubrics.yaml"
+        if target.exists():
+            target.replace(task_dir / "rubrics.yaml.bak")
+            typer.echo("  旧 rubrics.yaml → rubrics.yaml.bak")
+        save_rubrics(final, target, include_meta=False)
+        typer.echo(f"✓ → {target}")
+
+    # 5. batch
+    if from_step <= 5:
+        hdr(5, f"batch(比例分配,total={total})")
+        # 复用 batch 命令(直接调函数会有 typer 装饰问题,这里用 subprocess 干净)
+        import subprocess
+        import sys
+        cmd = [sys.executable, "-m", "claw_eval.cli", "batch",
+               "--task", task, "--total", str(total),
+               "--no-dashboard-out"]
+        if no_judge:
+            cmd.append("--no-judge")
+        if config:
+            cmd += ["--config", config]
+        result = subprocess.run(cmd, env={**os.environ, "PYTHONPATH": "src"})
+        if result.returncode != 0:
+            typer.echo("✗ batch 失败,--from 5 续跑")
+            raise typer.Exit(1)
+
+    # 6. dashboard
+    if from_step <= 6:
+        hdr(6, "dashboard(出多页可视化)")
+        out = build_dashboard_from_dir(_ROOT / "traces", _ROOT / "reports")
+        typer.echo(f"✓ → {out}")
+
+    typer.echo(f"\n═════ pipeline 完成 ═════")
+
+
 @app.command()
 def editor(port: int = typer.Option(8501, help="Streamlit 端口")):
     """启动 Persona 编辑器(Streamlit 网页)—— 选性格、画状态机、配 noise、保存 YAML。
