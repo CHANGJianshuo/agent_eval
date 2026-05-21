@@ -283,6 +283,29 @@ def dashboard(traces_dir: str = typer.Option(None),
 
 
 @app.command()
+def editor(port: int = typer.Option(8501, help="Streamlit 端口")):
+    """启动 Persona 编辑器(Streamlit 网页)—— 选性格、画状态机、配 noise、保存 YAML。
+
+    需要先装 ui 依赖:`pip install -e ".[ui]"`(streamlit + pandas)。
+    """
+    import subprocess
+    import sys
+    app_file = Path(__file__).parent / "editor" / "app.py"
+    if not app_file.exists():
+        typer.echo(f"[error] 编辑器入口不存在:{app_file}")
+        raise typer.Exit(1)
+    cmd = [sys.executable, "-m", "streamlit", "run", str(app_file),
+           "--server.port", str(port), "--server.headless", "true"]
+    typer.echo(f"启动 Persona 编辑器:http://localhost:{port}")
+    typer.echo(f"(Ctrl+C 停止)")
+    try:
+        subprocess.run(cmd, check=False)
+    except FileNotFoundError:
+        typer.echo("[error] streamlit 未安装。执行:pip install -e '.[ui]'")
+        raise typer.Exit(1)
+
+
+@app.command()
 def validate(task: str = typer.Option(..., help="任务 id 或目录")):
     """对任务做一致性检查 —— 命名 / safety 标记 / trigger 可达性 / 状态机终止 / sampling。"""
     from .validator import validate_task

@@ -13,6 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+ui  = ["streamlit>=1.30", "pandas>=2.0"]      # persona 编辑器(claw-eval editor)
 
 [project.scripts]
 claw-eval = "claw_eval.cli:main"
