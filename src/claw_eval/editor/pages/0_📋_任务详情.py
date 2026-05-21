@@ -229,10 +229,32 @@ with tab1:
 
 # ========================== Tab 2:Prompt ==========================
 with tab2:
-    st.subheader("任务 Prompt(task.yaml)")
+    from claw_eval.task_gen.versioning import (
+        get_version_yaml, list_versions, save_version, switch_to_version,
+    )
+
+    st.subheader("任务 Prompt(task.yaml)+ 版本管理")
     yaml_path = task_dir / "task.yaml"
     if not yaml_path.exists():
         st.error("task.yaml 不存在"); st.stop()
+
+    versions = list_versions(task_dir)
+
+    # 版本切换栏
+    if versions:
+        c_v1, c_v2 = st.columns([3, 1])
+        ver_labels = [v.label for v in versions]
+        ver_idx = ver_labels.index(versions[-1].label)
+        chosen_ver = c_v1.selectbox(
+            "切换到历史版本(读 .versions/<label>.yaml)",
+            ver_labels, index=ver_idx, key=f"verselect_{task}",
+            help="当前 task.yaml 等同于上一次 save_version 的版本")
+        if c_v2.button("↩ 切回此版本", key=f"verswitch_{task}",
+                        disabled=(chosen_ver == versions[-1].label)):
+            switch_to_version(task_dir, chosen_ver)
+            st.success(f"✓ task.yaml 已切到 {chosen_ver}")
+            st.rerun()
+
     try:
         td_obj = TaskDefinition.from_yaml(yaml_path)
     except Exception as e:
@@ -240,7 +262,8 @@ with tab2:
 
     st.markdown("**Prompt(给 SUT 的 system message)**")
     new_prompt = st.text_area("", value=td_obj.prompt,
-                                height=400, label_visibility="collapsed")
+                                height=380, label_visibility="collapsed",
+                                key=f"prompt_ta_{task}")
 
     st.markdown("**业务变量**")
     if td_obj.variables:
@@ -251,13 +274,37 @@ with tab2:
     else:
         st.caption("(没有声明变量)")
 
-    if st.button("💾 保存 Prompt", type="primary", key="save_prompt"):
+    # 保存 + 备份版本
+    c_s1, c_s2 = st.columns([1, 2])
+    if c_s1.button("💾 保存 Prompt", type="primary", key="save_prompt"):
         data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
         data["prompt"] = new_prompt
         yaml_path.write_text(
-            yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+            yaml.safe_dump(data, allow_unicode=True, sort_keys=False,
+                            default_flow_style=False),
             encoding="utf-8")
         st.success("✓ 已保存。改了 prompt 后跑 batch 可能跟旧版评测结果有差异。")
+    new_ver_label = c_s2.text_input("版本 label(留空不备份)",
+                                       placeholder="如 v2-peak-fix",
+                                       key=f"newver_{task}")
+    if new_ver_label and st.button("📌 备份当前为新版本", key=f"savever_{task}"):
+        info = save_version(task_dir, new_ver_label,
+                              based_on=versions[-1].label if versions else None,
+                              note="手动备份")
+        st.success(f"✓ 已备份为 {info.label}")
+        st.rerun()
+
+    # 版本历史
+    if versions:
+        st.markdown("---")
+        st.markdown("**版本历史**")
+        st.dataframe(pd.DataFrame([
+            {"label": v.label, "时间": v.created_at[:16],
+             "based_on": v.based_on or "—",
+             "应用建议": ", ".join(v.applied_recs) or "—",
+             "备注": v.note}
+            for v in reversed(versions)
+        ]), hide_index=True, use_container_width=True)
 
 
 # ========================== Tab 3:评测方案 ==========================
@@ -444,44 +491,21 @@ with tab5:
         st.caption("(还没跑过)")
 
 
-# ========================== Tab 6:改进 ==========================
+# ========================== Tab 6:改进(含自动应用)==========================
 with tab6:
-    st.subheader("改进建议(基于评测结果)")
-    rec_file = REPORTS_DIR / f"recommendations_{task}.json"
-    if not rec_file.exists():
-        st.info("还没有改进建议。点下方按钮触发 LLM 分析(需先有 result.json)。")
-    else:
-        try:
-            data = json.loads(rec_file.read_text(encoding="utf-8"))
-            recs = data.get("recommendations", [])
-            st.caption(f"上次生成:{data.get('generated_at', '?')}({len(recs)} 条)")
-            for i, r in enumerate(recs, 1):
-                with st.expander(
-                    f"**[{i}] {r['rubric_id']}** · avg={r['avg_score']:.2f} · "
-                    f"severity={r.get('severity', 0):.2f}"
-                    + (f" · 预期 +{r['estimated_lift']:.2f}"
-                       if r.get('estimated_lift') else ""),
-                    expanded=(i == 1),
-                ):
-                    if r.get("suggested_prompt_change"):
-                        st.markdown(f"**建议**:")
-                        st.markdown(r["suggested_prompt_change"])
-                    if r.get("rationale"):
-                        st.caption(f"理由:{r['rationale']}")
-                    if r.get("violation_samples"):
-                        st.caption(f"违规样本({len(r['violation_samples'])} 个):")
-                        for s in r["violation_samples"]:
-                            st.markdown(
-                                f"- `{s.get('case', '?')}` 第{s.get('turn', '?')}轮 "
-                                f"(分 {s.get('score', '?')}):"
-                                f"<br>&nbsp;&nbsp;<em>{s.get('evidence', '')[:120]}</em>",
-                                unsafe_allow_html=True,
-                            )
-        except Exception as e:
-            st.error(f"解析失败:{e}")
+    from claw_eval.task_gen.apply_recommendation import (
+        diff_stats, generate_prompt_patch, unified_diff,
+    )
+    from claw_eval.task_gen.versioning import save_version, list_versions
 
-    if st.button("🔄 重新跑 recommend(LLM,需 ~3-5 分钟)",
-                 key=f"recompute_{task}"):
+    st.subheader("改进建议 + 一键应用到 prompt")
+    st.caption("**自改作用面**:只动 task.yaml 的 prompt;rubrics / personas / sampling 不动。"
+                "接受 → 自动创建新版本(可在 Tab 📝 切回)。")
+
+    rec_file = REPORTS_DIR / f"recommendations_{task}.json"
+
+    c_top1, c_top2 = st.columns([1, 3])
+    if c_top1.button("🔄 跑 recommend(LLM 3-5 分钟)", key=f"recompute_{task}"):
         cmd = [sys.executable, "-m", "claw_eval.cli", "recommend",
                "--task", task]
         env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
@@ -490,4 +514,116 @@ with tab6:
                                     env=env, cwd=str(ROOT))
         st.code(proc.stdout[-2000:], language="text")
         if proc.returncode == 0:
-            st.success("✓ 完成。刷新页面看建议。")
+            st.success("✓ 完成。下面就显示新建议。"); st.rerun()
+
+    if not rec_file.exists():
+        st.info("还没有改进建议。先跑过 batch(产生 result.json)+ 上方按钮触发 recommend。")
+    else:
+        try:
+            data = json.loads(rec_file.read_text(encoding="utf-8"))
+            recs = data.get("recommendations", [])
+        except Exception as e:
+            st.error(f"解析失败:{e}"); recs = []
+
+        st.caption(f"上次 recommend:{data.get('generated_at', '?')}({len(recs)} 条)")
+
+        # 每条建议
+        for i, r in enumerate(recs, 1):
+            rid = r["rubric_id"]
+            with st.expander(
+                f"**[{i}] {rid}** · avg={r['avg_score']:.2f} · "
+                f"severity={r.get('severity', 0):.2f}"
+                + (f" · 预期 +{r['estimated_lift']:.2f}"
+                   if r.get('estimated_lift') else ""),
+                expanded=(i == 1),
+            ):
+                if r.get("suggested_prompt_change"):
+                    st.markdown("**建议**:")
+                    st.markdown(r["suggested_prompt_change"])
+                if r.get("rationale"):
+                    st.caption(f"**理由**:{r['rationale']}")
+                if r.get("violation_samples"):
+                    with st.expander(f"违规样本({len(r['violation_samples'])} 个)"):
+                        for s in r["violation_samples"]:
+                            st.markdown(
+                                f"- `{s.get('case', '?')}` 第{s.get('turn', '?')}轮 "
+                                f"(分 {s.get('score', '?')}):"
+                                f"<br>&nbsp;&nbsp;<em>{s.get('evidence', '')[:120]}</em>",
+                                unsafe_allow_html=True,
+                            )
+
+                # ---- 自动应用按钮 + diff ----
+                st.markdown("---")
+                patch_key = f"patch_{task}_{rid}"
+                btn_key = f"applybtn_{task}_{rid}"
+
+                if c_top2.empty() and False:
+                    pass
+
+                if st.button(f"🤖 自动应用建议(LLM 生成 patch)",
+                             key=btn_key,
+                             disabled=not r.get("suggested_prompt_change")):
+                    with st.spinner("LLM 改写 prompt 中(~30s)…"):
+                        cfg_path = ROOT / "configs" / "models.yaml"
+                        with open(cfg_path) as f:
+                            cfg = yaml.safe_load(f)
+                        judge_model = cfg["judge"]["model"]
+                        try:
+                            # 读当前 task.yaml prompt
+                            cur_data = yaml.safe_load(
+                                (task_dir / "task.yaml").read_text(encoding="utf-8"))
+                            old_prompt = cur_data.get("prompt", "")
+                            new_prompt = generate_prompt_patch(
+                                old_prompt, r, judge_model)
+                            st.session_state[patch_key] = {
+                                "old": old_prompt,
+                                "new": new_prompt,
+                            }
+                        except Exception as exc:
+                            st.error(f"LLM 调用失败:{exc}")
+
+                if patch_key in st.session_state:
+                    p = st.session_state[patch_key]
+                    stats = diff_stats(p["old"], p["new"])
+                    st.markdown(
+                        f"**Diff**:加 {stats['added']} 行 / 删 {stats['removed']} 行")
+                    diff_text = unified_diff(
+                        p["old"], p["new"],
+                        old_label="当前 prompt", new_label="LLM 改写后")
+                    st.code(diff_text, language="diff")
+
+                    cA, cR = st.columns([1, 1])
+                    accept_key = f"accept_{task}_{rid}"
+                    if cA.button(f"✓ 接受 → 备份 + 应用", type="primary",
+                                  key=accept_key):
+                        # 备份当前 + 写新 prompt
+                        from datetime import datetime as _dt
+                        new_label = f"vN_{_dt.now().strftime('%m%d_%H%M')}_{rid.replace('.','_')}"
+                        versions = list_versions(task_dir)
+                        prev_label = versions[-1].label if versions else "v1"
+                        # 1) 先备份当前(应用前的状态)
+                        if not versions:
+                            save_version(task_dir, "v1",
+                                          note="apply 前自动备份")
+                        # 2) 写新 prompt
+                        cur_data["prompt"] = p["new"]
+                        (task_dir / "task.yaml").write_text(
+                            yaml.safe_dump(cur_data, allow_unicode=True,
+                                            sort_keys=False,
+                                            default_flow_style=False),
+                            encoding="utf-8")
+                        # 3) 备份新版本
+                        save_version(task_dir, new_label,
+                                      based_on=prev_label,
+                                      applied_recs=[rid],
+                                      note=f"自动应用建议 {rid}")
+                        st.success(
+                            f"✓ 应用完成。新版本:{new_label}。"
+                            f"建议:用「Tab 🏃 评测」跑 `--label {new_label}`,"
+                            "然后在「📈 回归对比」页跟基线比对。")
+                        st.session_state.pop(patch_key, None)
+                        st.rerun()
+                    if cR.button("✗ 拒绝(关闭 diff)",
+                                  key=f"reject_{task}_{rid}"):
+                        st.session_state.pop(patch_key, None)
+                        st.rerun()

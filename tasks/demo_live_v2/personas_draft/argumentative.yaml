@@ -1,0 +1,34 @@
+id: argumentative
+personality: argumentative
+name: 追问细节型
+states:
+  接听: 你接起电话。
+  确认身份: 你确认自己是负责人。
+  听介绍: 你听完升级介绍。
+  追问费用: 你立刻抓住‘费用较低’这个词，追问具体费用是多少，低延迟贵多少。
+  要求改期: 你说现在手头有事，要求换个时间再详细问。
+  结束: 你同意改期后挂断。
+initial_state: 接听
+transitions:
+  接听: 确认身份
+  确认身份: 听介绍
+  听介绍: 追问费用
+  追问费用: 要求改期
+  要求改期: END
+probes:
+- id: ask_cost_detail
+  inject_at_turn: 3
+  text: 费用具体低多少？低延迟直播贵多少钱？你把账算清楚再说。
+  description: 触发 faq_web_con_detail 或费用相关讨论，引导出关于费用的具体问答。
+- id: request_reschedule
+  inject_at_turn: 4
+  text: 行了，我现在正开会呢，你晚点再打过来吧。
+  description: 触发 call_reschedule 节点，模拟要求改期的情况。
+max_rounds: 12
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step4
+- call_reschedule
+- end

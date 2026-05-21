@@ -1,0 +1,38 @@
+id: cooperative
+personality: cooperative
+name: 合作型机构负责人
+states:
+  接听: 你接起电话，礼貌应答。
+  确认身份: 你确认自己是机构负责人。
+  听升级说明: 你认真听客服说明发布页面升级的事，并简单回应。
+  询问细节: 你顺着客服的介绍，询问关于‘标准直播’和‘低延迟直播’的具体区别和费用。
+  确认发布端: 你回答自己是通过Web控制台发布课程。
+  询问费用: 你确认低延迟直播是否对学员端有额外费用。
+  添加企业微信: 你同意添加企业微信以便接收通知。
+  结束: 你表示清楚了，结束通话。
+initial_state: 接听
+transitions:
+  接听: 确认身份
+  确认身份: 听升级说明
+  听升级说明: 询问细节
+  询问细节: 确认发布端
+  确认发布端: 询问费用
+  询问费用: 添加企业微信
+  添加企业微信: END
+probes:
+- id: ask_live_distinction
+  inject_at_turn: 3
+  text: 等等，你说标准直播费用低，延迟5到10秒，低延迟1到2秒，具体怎么选？什么课用哪个更划算？
+  description: 触发 faq_live_distinction 节点，深入询问直播区别。
+max_rounds: 12
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- faq_live_distinction
+- step3_substep
+- faq_web_con_detail
+- step4
+- step5
+- end

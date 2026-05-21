@@ -1,0 +1,39 @@
+id: confused
+personality: confused
+name: 茫然用户
+states:
+  接听: 你接起电话。
+  确认身份: 你确认自己是负责人。
+  听升级: 你听完客服说发布页要加两个选项。
+  困惑: 你完全没听懂‘标准直播’和‘低延迟直播’有什么区别，为什么要选。
+  追问细节: 你反复让客服解释清楚，用你听得懂的话说。
+  模糊回答: 对于通过哪个系统发布，你也不太确定，支支吾吾。
+  结束: 你最后说再考虑一下，挂断。
+initial_state: 接听
+transitions:
+  接听: 确认身份
+  确认身份: 听升级
+  听升级: 困惑
+  困惑: 追问细节
+  追问细节: 模糊回答
+  模糊回答: END
+probes:
+- id: confused_about_distinction
+  inject_at_turn: 3
+  text: 等一下，你说标准直播和低延迟直播，这俩到底啥意思？我搞不懂为啥要分两个。
+  description: 主要触发 faq_live_distinction 节点，测试客服对关键区别的解释能力。
+- id: unsure_about_platform
+  inject_at_turn: 5
+  text: 我发课...好像是在网页上？还是哪个系统？我也记不清了。
+  description: 触发 faq_web_con_detail 节点，测试客服如何引导用户明确发布端。
+max_rounds: 12
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- faq_live_distinction
+- step3_substep
+- faq_web_con_detail
+- step5
+- end
