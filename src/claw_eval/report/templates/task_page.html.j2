@@ -140,13 +140,15 @@
     <h2>按 Persona 看</h2>
     <table>
       <thead><tr>
-        <th>Persona</th><th>运行数</th><th>通过</th><th>通过率</th>
+        <th>Persona</th><th style="min-width:240px;">备注</th>
+        <th>运行数</th><th>通过</th><th>通过率</th>
         <th>完成度</th><th>鲁棒性</th><th>安全</th>
       </tr></thead>
       <tbody>
       {% for pid, bp in summary.by_persona.items() %}
         <tr>
           <td><strong>{{ pid }}</strong></td>
+          <td class="meta">{{ persona_meta.get(pid, '') }}</td>
           <td>{{ bp.n }}</td>
           <td>{{ bp.pass_n }}</td>
           <td class="{% if bp.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ '%.0f%%' % (bp.pass_rate * 100) }}</td>
@@ -209,7 +211,9 @@
     <h2>按 Rubric 看(全 persona 合并)</h2>
     <table>
       <thead><tr>
-        <th>维度</th><th>Rubric</th><th>触发次数</th><th>平均得分</th>
+        <th>维度</th><th>Rubric</th>
+        <th style="min-width:260px;">备注(check 内容)</th>
+        <th>触发次数</th><th>平均得分</th>
       </tr></thead>
       <tbody>
       {% for rid in summary.rubric_order %}
@@ -217,6 +221,7 @@
         <tr>
           <td><span class="dim-{% if summary.rubric_dim[rid] == 'completion' %}comp{% elif summary.rubric_dim[rid] == 'robustness' %}robu{% else %}safe{% endif %}-text">{{ summary.rubric_dim[rid] }}</span></td>
           <td>{{ rid }}</td>
+          <td class="meta">{{ rubric_meta.get(rid, '') }}</td>
           <td>{% if br %}{{ br.n }}{% else %}0{% endif %}</td>
           <td class="{% if br and br.avg_score >= 0.8 %}score-good{% elif br and br.avg_score < 0.5 %}score-bad{% endif %}">{% if br %}{{ '%.2f' % br.avg_score }}{% else %}— 未触发{% endif %}</td>
         </tr>

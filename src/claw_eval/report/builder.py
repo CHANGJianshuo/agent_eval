@@ -125,11 +125,35 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
         # 推断 tasks/<id>/ 读 flow.yaml,生成「跨 case 平均」着色的流程图
         task_dir = _infer_task_dir(task_results[0]) if task_results else None
         flow_option = None
+        rubric_meta: dict[str, str] = {}
+        persona_meta: dict[str, str] = {}
         if task_dir:
             flow = load_flow(task_dir / "flow.yaml")
             if flow:
                 flow_option = build_flow_option(
                     flow, aggregate_rubric_scores(summary.by_rubric))
+            # 加载 rubric.check 作为「备注」
+            try:
+                from ..models.rubric import load_rubrics as _load_r
+                for r in _load_r(task_dir / "rubrics.yaml"):
+                    rubric_meta[r.id] = r.check
+            except Exception:  # noqa: BLE001
+                pass
+            # 加载 persona 名 + 性格 description 作为「备注」
+            try:
+                from ..models.persona import load_persona as _load_p
+                root = task_dir.parent.parent
+                p_dir = root / "personalities"
+                n_file = root / "configs" / "noise_profiles.yaml"
+                for pf in (task_dir / "personas").glob("*.yaml"):
+                    try:
+                        p = _load_p(pf, personalities_dir=p_dir, noise_file=n_file)
+                        label = p.name if p.name else p.id
+                        persona_meta[p.id] = f"{label} · {p.description}"
+                    except Exception:  # noqa: BLE001
+                        pass
+            except Exception:  # noqa: BLE001
+                pass
 
         # 每条 result 出单 case 报告(传 task_dir 让单 case 流程图也能渲染)
         for idx, (run, r) in enumerate(zip(summary.runs, task_results)):
@@ -155,6 +179,8 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             summary=summary,
             flow_option=flow_option,
             recommendations=recommendations,
+            rubric_meta=rubric_meta,
+            persona_meta=persona_meta,
         )
         (out_dir / page_file).write_text(html, encoding="utf-8")
 

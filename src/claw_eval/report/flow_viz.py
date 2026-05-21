@@ -23,21 +23,30 @@ def color_for(score: float | None) -> str:
 
 
 def _auto_layout(flow: FlowDiagram) -> dict[str, tuple[float, float]]:
-    """没手工坐标时:主流程横向排,optional 节点上下错开。"""
+    """没手工坐标时:主流程在 y=0 横向排,optional 节点在 y=±130 上下两排
+    分别递增 x,避免任何节点位置重叠。"""
     pos: dict[str, tuple[float, float]] = {}
+    main_step = 180.0
+    opt_step = 170.0
     main_x = 0.0
-    opt_up = True
+    opt_top_x = 90.0          # 起点稍偏,与主线 x=0 错开
+    opt_bot_x = 90.0
+    use_top = True
     for n in flow.nodes:
         if n.x is not None and n.y is not None:
             pos[n.id] = (n.x, n.y)
             continue
         if n.optional:
-            # 找最近的主线节点 x(已分配过的最大主线 x - 70)
-            pos[n.id] = (main_x - 70, 110 if opt_up else -110)
-            opt_up = not opt_up
+            if use_top:
+                pos[n.id] = (opt_top_x, 140.0)
+                opt_top_x += opt_step
+            else:
+                pos[n.id] = (opt_bot_x, -140.0)
+                opt_bot_x += opt_step
+            use_top = not use_top
         else:
             pos[n.id] = (main_x, 0.0)
-            main_x += 160
+            main_x += main_step
     return pos
 
 
