@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { MilestoneProgress } from '@/components/ui/Progress'
 import { NewTestForm } from '@/components/NewTestForm'
+import { TaskConfig } from '@/components/TaskConfig'
 
 
 export default function TaskOverview() {
@@ -108,17 +109,12 @@ export default function TaskOverview() {
       )}
 
       {/* 任务级配置(可折叠) */}
-      <details className="border border-border rounded-lg">
+      <details className="border border-border rounded-lg" open>
         <summary className="px-5 py-3 cursor-pointer text-sm font-medium hover:bg-accent">
-          ⚙️ 任务级配置(Prompt / Rubrics / Persona)— 下轮完整版可视化编辑
+          ⚙️ 任务级配置(Prompt / Rubrics / 版本)
         </summary>
-        <div className="px-5 py-4 border-t border-border text-sm text-muted-foreground space-y-2">
-          <p>当前完整的「任务级配置」编辑(Prompt 改 + rubric 查看 + persona 卡片)在 Streamlit 端可用:</p>
-          <p>
-            <code className="text-xs">PYTHONPATH=src streamlit run src/claw_eval/editor/app.py</code>
-            <br />然后浏览器 <a href="http://localhost:8501/" target="_blank" rel="noopener" className="text-foreground hover:underline">http://localhost:8501/</a>
-          </p>
-          <p>下轮(Phase 3)在 React 里实现。</p>
+        <div className="px-5 py-4 border-t border-border">
+          <TaskConfig taskId={taskId} />
         </div>
       </details>
     </div>
