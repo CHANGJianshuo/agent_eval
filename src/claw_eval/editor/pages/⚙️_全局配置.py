@@ -160,11 +160,112 @@ except Exception as e:
         st.success(f"✓ 已保存到 {cfg_path}")
 
 
-# ============================ Tab 2:Persona 库(全局) ============================
+# ============================ Tab 2:Persona 库 = 5 个并列维度的属性字典 ============================
 with tab_personality:
-    st.subheader("🎭 Persona 库(跨任务复用)")
-    st.caption("Persona = 性格 + 说话风格 + 人口学(MBTI/性别/年龄/教育)。"
-                "任务里的 persona 引用这里的模板,改一个会影响所有引用者。")
+    st.subheader("🎭 Persona 库 · 5 个并列维度的属性字典")
+    st.caption("**性格 / MBTI / 性别 / 年龄段 / 教育**这 5 个**并列的「类」**;"
+                "每个类下面有多个**属性值**(选项)。任务的「新建测试」时可以直接勾选这些属性组合。")
+
+    # 5 个维度的可选值 + 使用统计
+    DIMS = {
+        "attitude": {
+            "name": "📌 性格 attitude",
+            "values": ["cooperative", "refuse", "hesitant",
+                       "argumentative", "confused", "blunt",
+                       "hurried", "adversarial"],
+            "desc": {
+                "cooperative": "合作型 — 配合、礼貌、简短",
+                "refuse": "抵触型 — 不愿做、坚决",
+                "hesitant": "犹豫型 — 反复追问",
+                "argumentative": "抬杠型 — 质疑、爱反问",
+                "confused": "茫然型 — 不清楚",
+                "blunt": "直接强势型 — 追着问、直接",
+                "hurried": "匆忙型 — 急、话少",
+                "adversarial": "对抗型 — prompt 注入 / 社工 / 施压",
+            },
+        },
+        "mbti": {
+            "name": "📌 MBTI",
+            "values": [a + b + c + d for a in "IE" for b in "NS"
+                       for c in "FT" for d in "JP"],
+            "desc": {},
+        },
+        "gender": {
+            "name": "📌 性别",
+            "values": ["male", "female"],
+            "desc": {"male": "男", "female": "女"},
+        },
+        "age_range": {
+            "name": "📌 年龄段",
+            "values": ["<20", "20-29", "30-39", "40-49", "50+"],
+            "desc": {},
+        },
+        "education": {
+            "name": "📌 教育",
+            "values": ["primary", "middle", "high", "college", "postgrad"],
+            "desc": {
+                "primary": "小学", "middle": "初中",
+                "high": "高中", "college": "本科",
+                "postgrad": "研究生及以上",
+            },
+        },
+    }
+
+    # 统计每个属性值的使用次数
+    usage = {dim: {v: 0 for v in cfg["values"]}
+              for dim, cfg in DIMS.items()}
+    for p in persona_data.values():
+        for dim in DIMS:
+            v = getattr(p.demographics, dim)
+            if v in usage[dim]:
+                usage[dim][v] += 1
+
+    st.markdown("---")
+    for dim, cfg in DIMS.items():
+        with st.expander(f"{cfg['name']} · {len(cfg['values'])} 种",
+                           expanded=(dim in ("attitude",))):
+            # 每个属性值一行
+            for v in cfg["values"]:
+                n_use = usage[dim].get(v, 0)
+                desc = cfg["desc"].get(v, "")
+                badge = (f'<span class="badge badge-success">{n_use} 在用</span>'
+                         if n_use > 0
+                         else '<span class="badge badge-gray">未使用</span>')
+                st.markdown(
+                    f'<div style="display:flex; padding:6px 8px;'
+                    f' border-bottom:1px solid #f1f5f9;">'
+                    f'<div style="width:130px;"><strong>{v}</strong></div>'
+                    f'<div style="flex:1; color:#475569;">{desc}</div>'
+                    f'<div>{badge}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+    st.markdown("---")
+    st.caption("💡 **在「📋 任务详情 → 任务概览 → ➕ 新建测试」表单里**,"
+                "可以根据这些维度勾选 persona,系统按勾选组合分配权重。")
+
+    # ============== 下面是「具体 persona 模板列表」(实际可被任务引用的 persona)==============
+    st.markdown("### 已有 persona 模板")
+    st.caption("这些是实际的 persona 文件(每个引用上面 5 个维度的具体属性值)。任务里通过这些模板引用。")
+
+    # 加载所有 persona 模板
+    persona_data: dict[str, Personality] = {}
+    for pid in list_personalities():
+        try:
+            persona_data[pid] = load_personality(PERSONALITIES_DIR / f"{pid}.yaml")
+        except Exception:
+            pass
+
+    personality_usage: dict[str, list[str]] = {pid: [] for pid in list_personalities()}
+    for task in list_tasks():
+        for pf in (TASKS_DIR / task / "personas").glob("*.yaml"):
+            try:
+                d = yaml.safe_load(pf.read_text(encoding="utf-8")) or {}
+                pers_id = d.get("personality")
+                if pers_id in personality_usage:
+                    personality_usage[pers_id].append(f"{task}/{pf.stem}")
+            except Exception:
+                pass
 
     # 算每个的被引用次数 + 加载完整数据
     personality_usage: dict[str, list[str]] = {pid: [] for pid in list_personalities()}

@@ -250,10 +250,10 @@ def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
         "跑完自动出建议", value=False, key=f"nt_ar_{task}",
         help="再 +3-5 min LLM 调用")
 
-    # ===== Persona 多选 + 权重 + 饼图 =====
+    # ===== Persona 维度筛选 + 多选 + 权重 + 饼图 =====
     st.markdown("---")
     st.markdown("### 👥 选 persona 和权重")
-    st.caption("默认从该任务的 sampling.yaml 取;勾选/调权重做本次测试的实验,不会改任务级配置。")
+    st.caption("可先按维度筛选,然后「一键勾选符合的」;也可手工勾每个 persona 改权重。")
 
     sampling_path = task_dir / "sampling.yaml"
     sampling_cfg = (load_sampling(sampling_path)
@@ -265,7 +265,7 @@ def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
         st.warning("该任务下没有非对抗 persona,无法跑测试")
         return
 
-    # 加载 demographics 用于显示
+    # 加载 demographics
     persona_info = {}
     for pname in persona_names:
         try:
@@ -276,25 +276,87 @@ def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
                 "mbti": p.demographics.mbti,
                 "age": p.demographics.age_range,
                 "gender": p.demographics.gender,
+                "education": p.demographics.education,
                 "attitude": p.demographics.attitude,
             }
         except Exception:
             persona_info[pname] = {}
 
-    # 初始权重:来自 prefill(复用),否则从 sampling.yaml
+    # 5 维度 multiselect 筛选
+    st.markdown("**🎯 按维度筛选(可选)**")
+    dim_c1, dim_c2, dim_c3, dim_c4, dim_c5 = st.columns(5)
+    sel_atti = dim_c1.multiselect(
+        "性格", ["cooperative", "refuse", "hesitant", "argumentative",
+                  "confused", "blunt", "hurried"],
+        key=f"nt_dim_atti_{task}")
+    sel_mbti = dim_c2.multiselect(
+        "MBTI", [a + b + c + d for a in "IE" for b in "NS"
+                  for c in "FT" for d in "JP"],
+        key=f"nt_dim_mbti_{task}")
+    sel_gen = dim_c3.multiselect(
+        "性别", ["male", "female"], key=f"nt_dim_gen_{task}")
+    sel_age = dim_c4.multiselect(
+        "年龄", ["<20", "20-29", "30-39", "40-49", "50+"],
+        key=f"nt_dim_age_{task}")
+    sel_edu = dim_c5.multiselect(
+        "教育", ["primary", "middle", "high", "college", "postgrad"],
+        key=f"nt_dim_edu_{task}")
+
+    def _matches_filter(info: dict) -> bool:
+        if sel_atti and info.get("attitude") not in sel_atti:
+            return False
+        if sel_mbti and info.get("mbti") not in sel_mbti:
+            return False
+        if sel_gen and info.get("gender") not in sel_gen:
+            return False
+        if sel_age and info.get("age") not in sel_age:
+            return False
+        if sel_edu and info.get("education") not in sel_edu:
+            return False
+        return True
+
+    matching = [p for p in persona_names
+                 if _matches_filter(persona_info.get(p, {}))]
+    any_filter = bool(sel_atti or sel_mbti or sel_gen or sel_age or sel_edu)
+
+    fc1, fc2, fc3 = st.columns([1, 1, 3])
+    if any_filter:
+        fc3.caption(f"📌 符合筛选的 persona({len(matching)}/{len(persona_names)}): {matching}")
+    if fc1.button("☑ 一键勾选符合的", key=f"check_match_{task}",
+                    disabled=not any_filter):
+        st.session_state[f"_auto_check_{task}"] = set(matching)
+        st.rerun()
+    if fc2.button("☐ 清空勾选", key=f"clear_check_{task}"):
+        st.session_state[f"_auto_check_{task}"] = set()
+        st.rerun()
+
+    # 初始权重:来自 prefill,否则 sampling.yaml
     prefill_weights = (prefill.get("weights") if prefill else None) or {}
     default_weights = sampling_cfg.weights or {}
+    # 「一键勾选」session 覆盖
+    auto_check = st.session_state.get(f"_auto_check_{task}", None)
 
     rows = []
     for pname in persona_names:
         info = persona_info.get(pname, {})
         cur_w = float(prefill_weights.get(pname,
                                             default_weights.get(pname, 0)))
+        # 勾选状态:auto_check 优先,否则按权重>0
+        if auto_check is not None:
+            is_checked = pname in auto_check
+            if is_checked and cur_w == 0:
+                cur_w = 10.0      # 默认权重
+            elif not is_checked:
+                cur_w = 0.0
+        else:
+            is_checked = cur_w > 0
         rows.append({
-            "✓": cur_w > 0,
+            "✓": is_checked,
             "persona": pname,
             "MBTI": info.get("mbti", "—"),
+            "性别": info.get("gender", "—"),
             "年龄": info.get("age", "—"),
+            "教育": info.get("education", "—"),
             "态度": info.get("attitude", "—"),
             "权重": cur_w,
         })
@@ -305,7 +367,9 @@ def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
             "✓": st.column_config.CheckboxColumn(width="small"),
             "persona": st.column_config.TextColumn(disabled=True),
             "MBTI": st.column_config.TextColumn(disabled=True, width="small"),
+            "性别": st.column_config.TextColumn(disabled=True, width="small"),
             "年龄": st.column_config.TextColumn(disabled=True, width="small"),
+            "教育": st.column_config.TextColumn(disabled=True, width="small"),
             "态度": st.column_config.TextColumn(disabled=True, width="small"),
             "权重": st.column_config.NumberColumn(min_value=0.0, step=1.0),
         },
