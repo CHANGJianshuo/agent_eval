@@ -241,6 +241,25 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
     typer.echo(f"  run_id = {run_id} → traces/{run_id}/")
     by_persona: dict[str, list[float]] = {name: [] for name in names}
 
+    # 写 DB:开跑时 status=running,跑完 update status=done + 指标
+    try:
+        from .db import append_run, update_run
+        from .task_gen.versioning import current_version_label
+        agent_ver = current_version_label(task_dir)
+        run_params = {
+            "label": run_id,
+            "total": total,
+            "trials": trials,
+            "personas": personas,
+            "concurrency": n_workers,
+            "no_judge": no_judge,
+            "config": config,
+        }
+        append_run(run_id, task_def.task_id, run_params,
+                    agent_version=agent_ver)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"  (DB 写入失败 → 跳过历史索引:{exc})")
+
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         futures = {
             ex.submit(_run_one_trial, task_dir, task_def, rubrics,
@@ -261,13 +280,27 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
                 typer.echo(f"      ({done}/{len(pairs)} 完成)")
 
     typer.echo("\n[batch] 汇总:")
+    all_scores = []
+    n_pass = 0
     for name, scs in by_persona.items():
+        all_scores.extend(scs)
+        n_pass += sum(1 for s in scs if s >= 0.75)
         if len(scs) > 1:
             ph = scoring.compute_pass_hat_k(scs, k=len(scs))
             typer.echo(f"  {name:>20}: scores={[round(s,3) for s in scs]}  "
                        f"Pass^{len(scs)}={ph}")
         else:
             typer.echo(f"  {name:>20}: scores={[round(s,3) for s in scs]}")
+
+    # 更新 DB 状态
+    try:
+        from .db import update_run
+        pass_rate = n_pass / len(all_scores) if all_scores else 0.0
+        score_avg = (sum(all_scores) / len(all_scores)) if all_scores else 0.0
+        update_run(run_id, status="done", n_results=len(all_scores),
+                    pass_rate=pass_rate, task_score_avg=score_avg)
+    except Exception:  # noqa: BLE001
+        pass
 
     if dashboard_out:
         typer.echo("\n[batch] 生成 dashboard…")
