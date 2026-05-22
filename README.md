@@ -1,5 +1,9 @@
 # claw-eval · 对话模型指令遵循能力自动评测系统
 
+![tests](https://github.com/CHANGJianshuo/agent_eval/actions/workflows/test.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 针对「履约数字人外呼」场景的自动评测系统。给定一份**任务 Prompt** + 一个**被测对话模型(SUT)**,自动产出一份**可解释、可量化**的评测报告。
 
 > **当前状态**:MVP 完成 · 9 个 P0 + 3 个 P1 全部交付 · 192 单元测试全绿 · 真实跑过 34+ case
