@@ -146,7 +146,7 @@ def _render_new_task_form() -> None:
             st.success(f"✓ 已生成 tasks/{task_id}/")
             st.session_state["show_new_task"] = False
             st.session_state["current_task"] = task_id
-            st.session_state["view"] = "detail"
+            st.session_state["view"] = "task_overview"
             st.rerun()
         else:
             st.error(f"✗ 生成失败 exit={proc.returncode}")
@@ -262,7 +262,7 @@ def render_task_list() -> None:
         if cols[8].button("→ 进入", key=f"enter_{t}",
                             use_container_width=True):
             st.session_state["current_task"] = t
-            st.session_state["view"] = "detail"
+            st.session_state["view"] = "task_overview"
             st.rerun()
 
     # ----- 底部操作 -----
