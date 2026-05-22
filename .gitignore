@@ -18,3 +18,5 @@ reports/
 # 杂项
 .DS_Store
 *.swp
+.claw_eval.db
+/tmp/
