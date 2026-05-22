@@ -13,7 +13,7 @@ from . import routes_tasks, routes_tests, routes_personas, routes_config
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="claw-eval API",
+        title="DialAgentEval API",
         description="对话模型指令遵循自动评测系统",
         version="0.1.0",
     )

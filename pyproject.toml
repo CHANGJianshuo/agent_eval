@@ -1,5 +1,5 @@
 [project]
-name = "claw-eval"
+name = "DialAgentEval"
 version = "0.1.0"
 description = "履约数字人外呼场景 · 对话模型指令遵循自动评测系统"
 requires-python = ">=3.10"
@@ -13,10 +13,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-ui  = ["streamlit>=1.30", "pandas>=2.0"]      # persona 编辑器(claw-eval editor)
+ui  = ["streamlit>=1.30", "pandas>=2.0"]      # Streamlit UI (legacy)
+web = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]   # FastAPI + React UI (推荐)
 
 [project.scripts]
-claw-eval = "claw_eval.cli:main"
+# 主推 CLI(产品改名后的新命令)
+dial-agent-eval = "claw_eval.cli:main"
+# 旧命令保留(向后兼容,跟所有现有 README 例子兼容)
+claw-eval       = "claw_eval.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]

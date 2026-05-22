@@ -1,4 +1,4 @@
-# claw-eval · 对话模型指令遵循能力自动评测系统
+# DialAgentEval · 对话模型指令遵循能力自动评测系统
 
 ![tests](https://github.com/CHANGJianshuo/agent_eval/actions/workflows/test.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -159,6 +159,8 @@ claw-eval batch --task my_task --total 30 --label v2
 claw-eval regression --task my_task --old v1 --new v2
 ```
 
+> CLI 命令仍叫 `claw-eval`(entry_point 不变,避免破坏现有用法);产品名是 **DialAgentEval**(README / UI 显示)。
+
 或者**全 UI 里点**,体验跟命令行等价。
 
 ---
@@ -291,7 +293,7 @@ claw_eval/
 
 ## 相关参考资料
 
-- [**claw-eval**](https://github.com/claw-eval/claw-eval) —— LLM-as-agent 评测框架,最贴近的参考项目
+- [**DialAgentEval**](https://github.com/claw-eval/claw-eval) —— LLM-as-agent 评测框架,最贴近的参考项目
 - [**τ-bench / τ²-bench**](https://github.com/sierra-research/tau2-bench) —— Sierra,客服 agent + 用户模拟器
 - **AgentProcessBench**(arXiv 2603.14465)—— 步骤级过程评分
 - **A Survey on Evaluation of LLM-based Agents**(arXiv 2503.16416)—— 综述

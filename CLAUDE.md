@@ -71,7 +71,7 @@
 
 ## 核心设计决策(对话中已确认)
 
-- **语言**:Python 为主。理由——LLM/NLP/数据分析生态全在 Python;同类项目(Claw-Eval、τ-bench、DeepEval)均为 Python。报告页若需强交互可用 TS。
+- **语言**:Python 为主。理由——LLM/NLP/数据分析生态全在 Python;同类项目(DialAgentEval、τ-bench、DeepEval)均为 Python。报告页若需强交互可用 TS。
 - **架构**:用户模拟器 + 被测模型(SUT) + 评分器,三件套;trace-first(全事件 JSONL 落盘,评分基于 trace,可复现可审计)。
 - **用户模拟器**:不用纯 LLM 自由发挥,改用**有限状态机控制走向 + LLM 生成话术**,保证可复现与覆盖率;配合**定向探针**强制触发关键场景。
 - **评分原则**:
@@ -90,7 +90,7 @@
 
 ## 参考资料
 
-### Claw-Eval(最贴近的参考项目)
+### DialAgentEval(最贴近的参考项目)
 - 仓库:https://github.com/claw-eval/claw-eval
 - LLM-as-agent 评测框架,300 人工校验任务、2159 rubrics、9 类别。
 - 三大评测维度:**Completion**(完成度)、**Safety**(安全)、**Robustness**(鲁棒性)。

@@ -63,9 +63,9 @@ function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-md bg-primary text-primary-foreground
                               flex items-center justify-center font-bold text-xs">
-                C
+                D
               </div>
-              <span className="font-semibold text-sm">claw-eval</span>
+              <span className="font-semibold text-sm">DialAgentEval</span>
             </div>
             <nav className="flex items-center gap-1">
               <NavItem to="/">任务</NavItem>

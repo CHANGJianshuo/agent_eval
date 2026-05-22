@@ -1,4 +1,4 @@
-# claw-eval-web
+# DialAgentEval-web
 
 React + Vite + Tailwind 现代前端 (path 2,推荐)。
 
