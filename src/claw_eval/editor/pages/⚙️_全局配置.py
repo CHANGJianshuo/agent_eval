@@ -227,14 +227,28 @@ with tab_personality:
                     p = load_personality(PERSONALITIES_DIR / f"{pid}.yaml")
                     refs = personality_usage[pid]
                     refs_html = f'{len(refs)} 个 persona 在用'
+                    GENDER_ICON = {"male": "🧔", "female": "👩",
+                                    "unspecified": "👤"}
+                    g_icon = GENDER_ICON.get(p.demographics.gender, "👤")
                     st.markdown(f"""
 <div class="persona-card">
-  <div class="pc-title">🎭 {p.name}</div>
-  <div class="pc-meta">{pid}<br>
-    {p.demographics.mbti} · {p.demographics.age_range}<br>
-    态度:{p.demographics.attitude}
+  <div class="pc-title">{g_icon} {p.name}</div>
+  <div class="pc-meta" style="font-size:0.72rem; color:#94a3b8;">{pid}</div>
+  <table style="margin-top:8px; font-size:0.82rem; width:100%; color:#475569;">
+    <tr><td style="padding:2px 4px;color:#94a3b8;">MBTI</td>
+        <td style="padding:2px 4px;"><strong>{p.demographics.mbti}</strong></td></tr>
+    <tr><td style="padding:2px 4px;color:#94a3b8;">性别</td>
+        <td style="padding:2px 4px;">{p.demographics.gender}</td></tr>
+    <tr><td style="padding:2px 4px;color:#94a3b8;">年龄</td>
+        <td style="padding:2px 4px;">{p.demographics.age_range}</td></tr>
+    <tr><td style="padding:2px 4px;color:#94a3b8;">教育</td>
+        <td style="padding:2px 4px;">{p.demographics.education}</td></tr>
+    <tr><td style="padding:2px 4px;color:#94a3b8;">态度</td>
+        <td style="padding:2px 4px;"><strong>{p.demographics.attitude}</strong></td></tr>
+  </table>
+  <div class="pc-meta" style="margin-top:8px; padding-top:6px; border-top:1px solid #e2e8f0;">
+    {refs_html}
   </div>
-  <div class="pc-meta" style="margin-top:6px;">{refs_html}</div>
 </div>""", unsafe_allow_html=True)
                     with st.expander("✏ 编辑", expanded=False):
                         new_name = st.text_input("name", p.name, key=f"pn_{pid}")
