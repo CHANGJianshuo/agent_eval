@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:gh": "tsc -b && vite build --mode gh-pages --outDir dist-gh",
     "preview": "vite preview"
   },
   "dependencies": {

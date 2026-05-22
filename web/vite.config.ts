@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === 'gh-pages' ? '/agent_eval/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -12,7 +13,6 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // 把 /api/* 转发到 FastAPI 后端
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
@@ -20,4 +20,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))
