@@ -36,6 +36,12 @@ def create_app() -> FastAPI:
     def health():
         return {"status": "ok"}
 
+    # 托管 reports/(供前端 iframe 嵌入 dashboard HTML)
+    reports_dir = _find_repo_root() / "reports"
+    if reports_dir.exists():
+        app.mount("/reports", StaticFiles(directory=reports_dir),
+                  name="reports")
+
     # 挂业务路由
     app.include_router(routes_tasks.router, prefix="/api", tags=["tasks"])
     app.include_router(routes_tests.router, prefix="/api", tags=["tests"])
@@ -61,13 +67,16 @@ def create_app() -> FastAPI:
     return app
 
 
-def _find_web_dist() -> Path | None:
-    """找前端 build 产物(web/dist)。"""
+def _find_repo_root() -> Path:
+    """找仓库根目录。"""
     cur = Path(__file__).resolve()
     for parent in [cur, *cur.parents]:
-        candidate = parent / "web" / "dist"
-        if candidate.exists():
-            return candidate
         if (parent / "pyproject.toml").exists():
-            return parent / "web" / "dist"
-    return None
+            return parent
+    return Path.cwd()
+
+
+def _find_web_dist() -> Path | None:
+    """找前端 build 产物(web/dist)。"""
+    web_dist = _find_repo_root() / "web" / "dist"
+    return web_dist if web_dist.exists() else None

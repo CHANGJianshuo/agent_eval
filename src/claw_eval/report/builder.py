@@ -97,6 +97,55 @@ def build_case_report(result: GradingResult, out_path: str | Path,
     return out_path
 
 
+_DIM_LABELS = {
+    "attitude": "性格", "mbti": "MBTI", "gender": "性别",
+    "age_range": "年龄段", "education": "教育",
+}
+
+
+def _compute_dimensions_analysis(results: list[GradingResult]) -> dict:
+    """对每个维度属性值统计:命中数 + 通过率。
+
+    只看 result.demographics 非空的(即 --dimensions 模式生成的)。
+    返回:{
+      "attitude": [{"value": "cooperative", "n": 15, "pass_rate": 0.6, ...}, ...],
+      ...
+    }
+    """
+    by_dim: dict[str, dict[str, dict]] = {}
+    for r in results:
+        demo = getattr(r, "demographics", None) or {}
+        if not demo:
+            continue
+        for dim, val in demo.items():
+            d = by_dim.setdefault(dim, {})
+            v = d.setdefault(val, {"n": 0, "pass_n": 0, "score_sum": 0.0})
+            v["n"] += 1
+            v["score_sum"] += r.task_score
+            if r.passed:
+                v["pass_n"] += 1
+
+    out = {}
+    for dim, vals in by_dim.items():
+        rows = []
+        for val, stats in vals.items():
+            n = stats["n"]
+            rows.append({
+                "value": val,
+                "n": n,
+                "pass_n": stats["pass_n"],
+                "pass_rate": stats["pass_n"] / n if n else 0,
+                "avg_score": stats["score_sum"] / n if n else 0,
+            })
+        rows.sort(key=lambda x: -x["n"])
+        out[dim] = {
+            "label": _DIM_LABELS.get(dim, dim),
+            "rows": rows,
+            "total_n": sum(r["n"] for r in rows),
+        }
+    return out
+
+
 def build_dashboard(results: list[GradingResult], out_dir: str | Path,
                     task_names: dict[str, str] | None = None) -> Path:
     """按任务分组渲染:index 总览 + 每任务详情页 + 各单 case 报告。
@@ -201,6 +250,9 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             except Exception:  # noqa: BLE001
                 pass
 
+        # 维度分析:每个维度属性值的命中数 + pass rate
+        dimensions_analysis = _compute_dimensions_analysis(task_results)
+
         page_file = f"task_{task_id}.html"
         html = env.get_template("task_page.html.j2").render(
             task_id=task_id,
@@ -213,6 +265,7 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             rubric_meta=rubric_meta,
             persona_meta=persona_meta,
             persona_demo=persona_demo,
+            dimensions_analysis=dimensions_analysis,
         )
         (out_dir / page_file).write_text(html, encoding="utf-8")
 

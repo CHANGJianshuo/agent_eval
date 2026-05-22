@@ -326,6 +326,48 @@
   </div>
   {% endif %}
 
+  {% if dimensions_analysis %}
+  <div class="card">
+    <h2>👥 模拟用户维度分析</h2>
+    <div class="meta" style="margin-bottom: 10px;">
+      按维度独立统计:每个属性值的<strong>命中数</strong>和<strong>通过率</strong>。看哪类用户最难搞定。
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+      {% for dim_key, dim_data in dimensions_analysis.items() %}
+      <div style="border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
+        <h3 style="font-size: 0.95rem; margin: 0 0 8px 0;">{{ dim_data.label }} <span class="meta" style="font-weight:normal; font-size:0.78rem;">({{ dim_data.total_n }} 个 case)</span></h3>
+        <table style="width:100%; font-size: 0.85rem;">
+          <thead>
+            <tr style="color:#64748b; font-size:0.78rem;">
+              <th style="text-align:left;">属性值</th>
+              <th style="text-align:right;">case 数</th>
+              <th style="text-align:right;">通过率</th>
+              <th style="text-align:right;">平均分</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in dim_data.rows %}
+            <tr>
+              <td><code style="font-size:0.82rem;">{{ row.value }}</code></td>
+              <td style="text-align:right; color:#64748b;">{{ row.n }}</td>
+              <td style="text-align:right;
+                          {% if row.pass_rate >= 0.5 %}color:#22c55e;
+                          {% elif row.pass_rate >= 0.2 %}color:#eab308;
+                          {% else %}color:#ef4444;{% endif %}
+                          font-weight:600;">
+                {{ "%.0f%%" | format(row.pass_rate * 100) }}
+              </td>
+              <td style="text-align:right; color:#64748b;">{{ "%.2f" | format(row.avg_score) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="card">
     <h2>按 Persona 看(模拟用户具体数据)</h2>
     <table>
