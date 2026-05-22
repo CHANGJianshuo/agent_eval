@@ -152,8 +152,49 @@ h3 { font-size: 1.15rem !important; color: var(--gray-700); }
 /* 减少 Streamlit 元素之间的过大间距 */
 [data-testid="stVerticalBlock"] > div { gap: 0.5rem; }
 
-/* 隐藏 Streamlit 顶部菜单的「Deploy」按钮(部署相关,无关) */
-[data-testid="stToolbar"] { visibility: hidden; }
+/* 只隐藏 Streamlit「Deploy」按钮,不要隐藏整个 toolbar(那会一起隐藏 sidebar 展开键)*/
+.stDeployButton { display: none !important; }
+
+/* 「下一步」高亮按钮(用 :has 选择父级,Streamlit 1.x 兼容) */
+.next-step-hint {
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #eff6ff;
+    border-left: 3px solid var(--primary);
+    margin: 12px 0;
+}
+.next-step-hint .label {
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+/* 进度条胶囊配色 */
+.milestone-pill {
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: inline-block;
+    margin: 0 4px;
+    border: 1px solid var(--gray-200);
+    background: white;
+    color: var(--gray-500);
+}
+.milestone-pill.done {
+    background: #dcfce7;
+    color: #15803d;
+    border-color: #86efac;
+}
+.milestone-pill.current {
+    background: #fef3c7;
+    color: #b45309;
+    border-color: #fbbf24;
+}
+.milestone-arrow {
+    color: var(--gray-200);
+    margin: 0 2px;
+}
 </style>
 """
 
