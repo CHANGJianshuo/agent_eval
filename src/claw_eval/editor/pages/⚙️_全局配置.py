@@ -166,6 +166,14 @@ with tab_personality:
     st.caption("**性格 / MBTI / 性别 / 年龄段 / 教育**这 5 个**并列的「类」**;"
                 "每个类下面有多个**属性值**(选项)。任务的「新建测试」时可以直接勾选这些属性组合。")
 
+    # 加载所有 persona 模板(供维度统计和「具体模板列表」共用)
+    persona_data: dict[str, Personality] = {}
+    for pid in list_personalities():
+        try:
+            persona_data[pid] = load_personality(PERSONALITIES_DIR / f"{pid}.yaml")
+        except Exception:
+            pass
+
     # 5 个维度的可选值 + 使用统计
     DIMS = {
         "attitude": {
@@ -247,14 +255,6 @@ with tab_personality:
     # ============== 下面是「具体 persona 模板列表」(实际可被任务引用的 persona)==============
     st.markdown("### 已有 persona 模板")
     st.caption("这些是实际的 persona 文件(每个引用上面 5 个维度的具体属性值)。任务里通过这些模板引用。")
-
-    # 加载所有 persona 模板
-    persona_data: dict[str, Personality] = {}
-    for pid in list_personalities():
-        try:
-            persona_data[pid] = load_personality(PERSONALITIES_DIR / f"{pid}.yaml")
-        except Exception:
-            pass
 
     personality_usage: dict[str, list[str]] = {pid: [] for pid in list_personalities()}
     for task in list_tasks():
