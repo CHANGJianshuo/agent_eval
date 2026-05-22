@@ -20,3 +20,8 @@ reports/
 *.swp
 .claw_eval.db
 /tmp/
+
+# React frontend
+web/node_modules/
+web/dist/
+web/.vite/

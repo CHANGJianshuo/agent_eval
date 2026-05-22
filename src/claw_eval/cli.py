@@ -901,6 +901,30 @@ def pipeline(task: str = typer.Option(..., help="任务 id 或目录"),
 
 
 @app.command()
+def web(port: int = typer.Option(8000, help="FastAPI 端口"),
+         host: str = typer.Option("0.0.0.0", help="监听地址")):
+    """启动 FastAPI web 服务(新 React 前端 + REST API)。
+
+    依赖:`pip install -e '.[web]'`(fastapi + uvicorn)
+    前端 dev 模式:cd web && npm install && npm run dev(占 :5173)
+    或先 npm run build,FastAPI 同端口托管 SPA。
+
+    Swagger:http://localhost:8000/docs
+    """
+    try:
+        import uvicorn
+        from claw_eval.api.app import create_app
+    except ImportError:
+        typer.echo("[error] FastAPI / uvicorn 未装,跑:pip install -e '.[web]'")
+        raise typer.Exit(1)
+    app_ = create_app()
+    typer.echo(f"启动 web: http://localhost:{port}/")
+    typer.echo(f"Swagger:  http://localhost:{port}/docs")
+    typer.echo(f"前端 dev:cd web && npm install && npm run dev")
+    uvicorn.run(app_, host=host, port=port, log_level="info")
+
+
+@app.command()
 def editor(port: int = typer.Option(8501, help="Streamlit 端口")):
     """启动 Persona 编辑器(Streamlit 网页)—— 选性格、画状态机、配 noise、保存 YAML。
 
