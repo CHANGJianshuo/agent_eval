@@ -327,17 +327,25 @@
   {% endif %}
 
   <div class="card">
-    <h2>按 Persona 看</h2>
+    <h2>按 Persona 看(模拟用户具体数据)</h2>
     <table>
       <thead><tr>
-        <th>Persona</th><th style="min-width:240px;">备注</th>
+        <th>Persona</th>
+        <th>MBTI</th><th>年龄</th><th>性别</th><th>教育</th><th>态度</th>
+        <th style="min-width:200px;">说明</th>
         <th>运行数</th><th>通过</th><th>通过率</th>
         <th>完成度</th><th>鲁棒性</th><th>安全</th>
       </tr></thead>
       <tbody>
       {% for pid, bp in summary.by_persona.items() %}
+        {% set demo = persona_demo.get(pid, {}) %}
         <tr>
           <td><strong>{{ pid }}</strong></td>
+          <td class="meta">{{ demo.get('mbti', '—') }}</td>
+          <td class="meta">{{ demo.get('age', '—') }}</td>
+          <td class="meta">{{ demo.get('gender', '—') }}</td>
+          <td class="meta">{{ demo.get('education', '—') }}</td>
+          <td class="meta">{{ demo.get('attitude', '—') }}</td>
           <td class="meta">{{ persona_meta.get(pid, '') }}</td>
           <td>{{ bp.n }}</td>
           <td>{{ bp.pass_n }}</td>

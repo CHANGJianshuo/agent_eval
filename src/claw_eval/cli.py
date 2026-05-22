@@ -181,7 +181,9 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
               0, help="并发对话数;0 = 用配置文件的默认"),
           dashboard_out: bool = typer.Option(True),
           label: str = typer.Option(
-              "", help="run_id 标签(回归对比用);默认时间戳")):
+              "", help="run_id 标签(回归对比用);默认时间戳"),
+          weights: str = typer.Option(
+              "", help='JSON 字典 override sampling.yaml weights,如 \'{"cooperative":50,"refuse":20}\'')):
     """跑「多 persona × N trials」,case 间并行;跑完自动出 dashboard。
 
     两种模式:
@@ -206,11 +208,24 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
             typer.echo(f"[error] --total 模式需要 {samp_file}")
             raise typer.Exit(1)
         sampling_cfg = load_sampling(samp_file)
-        weights = sampling_cfg.weights
+        # 优先用 --weights JSON override
+        if weights:
+            import json as _json
+            try:
+                _override = _json.loads(weights)
+                if not isinstance(_override, dict):
+                    raise ValueError("--weights 必须是 JSON 字典")
+                weights_use = {k: float(v) for k, v in _override.items()}
+                typer.echo(f"  --weights override: {weights_use}")
+            except Exception as exc:
+                typer.echo(f"[error] --weights 解析失败:{exc}")
+                raise typer.Exit(1)
+        else:
+            weights_use = sampling_cfg.weights
         if personas:
             picked = {p.strip() for p in personas.split(",") if p.strip()}
-            weights = {k: v for k, v in weights.items() if k in picked}
-        alloc = {k: n for k, n in allocate(weights, total).items() if n > 0}
+            weights_use = {k: v for k, v in weights_use.items() if k in picked}
+        alloc = {k: n for k, n in allocate(weights_use, total).items() if n > 0}
         names = list(alloc.keys())
         pairs = [(name, i) for name, n in alloc.items() for i in range(n)]
         dist = ", ".join(f"{k}×{v}" for k, v in alloc.items())

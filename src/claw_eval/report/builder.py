@@ -127,6 +127,7 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
         flow_option = None
         rubric_meta: dict[str, str] = {}
         persona_meta: dict[str, str] = {}
+        persona_demo: dict[str, dict] = {}      # NEW: demographics
         if task_dir:
             flow = load_flow(task_dir / "flow.yaml")
             if flow:
@@ -150,6 +151,14 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
                         p = _load_p(pf, personalities_dir=p_dir, noise_file=n_file)
                         label = p.name if p.name else p.id
                         persona_meta[p.id] = f"{label} · {p.description}"
+                        # demographics dict for table display
+                        persona_demo[p.id] = {
+                            "mbti": p.demographics.mbti,
+                            "age": p.demographics.age_range,
+                            "gender": p.demographics.gender,
+                            "education": p.demographics.education,
+                            "attitude": p.demographics.attitude,
+                        }
                     except Exception:  # noqa: BLE001
                         pass
             except Exception:  # noqa: BLE001
@@ -203,6 +212,7 @@ def build_dashboard(results: list[GradingResult], out_dir: str | Path,
             safety_test=safety_test,
             rubric_meta=rubric_meta,
             persona_meta=persona_meta,
+            persona_demo=persona_demo,
         )
         (out_dir / page_file).write_text(html, encoding="utf-8")
 

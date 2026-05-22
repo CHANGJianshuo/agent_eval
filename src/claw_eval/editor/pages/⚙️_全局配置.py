@@ -32,12 +32,12 @@ from claw_eval.models.persona import (
 st.set_page_config(page_title="设置", page_icon="⚙️", layout="wide")
 inject_global_style()
 
-st.title("⚙️ 全局设置")
-st.caption("跨任务复用的资源(性格库 / 噪音库)+ 系统配置(API & 模型)。")
+st.title("⚙️ 全局配置")
+st.caption("跨任务复用的资源(Persona 库 / 噪音库)+ 系统配置(API & 模型)。")
 
 tab_api, tab_personality, tab_noise = st.tabs([
     "🔑 API & 模型",
-    "🎭 性格库",
+    "🎭 Persona 库",
     "📚 噪音库",
 ])
 
@@ -160,13 +160,20 @@ except Exception as e:
         st.success(f"✓ 已保存到 {cfg_path}")
 
 
-# ============================ Tab 2:性格库 ============================
+# ============================ Tab 2:Persona 库(全局) ============================
 with tab_personality:
-    st.subheader("🎭 性格库(跨任务复用)")
-    st.caption("改一个性格会影响所有引用它的 persona —— 修改前会显式告警影响范围。")
+    st.subheader("🎭 Persona 库(跨任务复用)")
+    st.caption("Persona = 性格 + 说话风格 + 人口学(MBTI/性别/年龄/教育)。"
+                "任务里的 persona 引用这里的模板,改一个会影响所有引用者。")
 
-    # 算每个性格的被引用次数
+    # 算每个的被引用次数 + 加载完整数据
     personality_usage: dict[str, list[str]] = {pid: [] for pid in list_personalities()}
+    persona_data: dict[str, Personality] = {}
+    for pid in list_personalities():
+        try:
+            persona_data[pid] = load_personality(PERSONALITIES_DIR / f"{pid}.yaml")
+        except Exception:
+            pass
     for task in list_tasks():
         for pf in (TASKS_DIR / task / "personas").glob("*.yaml"):
             try:
@@ -177,9 +184,41 @@ with tab_personality:
             except Exception:
                 pass
 
+    # 筛选栏
+    st.markdown("### 🔎 筛选")
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    f_att = fc1.selectbox(
+        "态度", ["全部", "cooperative", "refuse", "hesitant",
+                  "argumentative", "confused", "blunt", "hurried",
+                  "adversarial", "unspecified"], key="f_att")
+    f_mbti = fc2.selectbox(
+        "MBTI", ["全部"] + ["unspecified"] +
+                 [a + b + c + d for a in "IE" for b in "NS"
+                  for c in "FT" for d in "JP"],
+        key="f_mbti")
+    f_age = fc3.selectbox(
+        "年龄", ["全部", "unspecified", "<20", "20-29",
+                  "30-39", "40-49", "50+"], key="f_age")
+    f_gen = fc4.selectbox(
+        "性别", ["全部", "unspecified", "male", "female"], key="f_gen")
+
+    # 应用筛选
+    pids = []
+    for pid, p in persona_data.items():
+        d = p.demographics
+        if f_att != "全部" and d.attitude != f_att:
+            continue
+        if f_mbti != "全部" and d.mbti != f_mbti:
+            continue
+        if f_age != "全部" and d.age_range != f_age:
+            continue
+        if f_gen != "全部" and d.gender != f_gen:
+            continue
+        pids.append(pid)
+    st.caption(f"显示 {len(pids)} / {len(persona_data)} 个")
+
     # 卡片网格 + 编辑
     cards_per_row = 3
-    pids = list_personalities()
     for row_i in range(0, len(pids), cards_per_row):
         cols = st.columns(cards_per_row)
         for ci, pid in enumerate(pids[row_i:row_i + cards_per_row]):

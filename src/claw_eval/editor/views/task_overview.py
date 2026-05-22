@@ -220,6 +220,7 @@ def _render_test_card(test: dict, task: str) -> None:
 # ============================ 新建测试表单 ============================
 
 def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
+    import json as _json
     st.markdown("### ➕ 新建测试")
     c_back, _ = st.columns([1, 5])
     if c_back.button("← 取消", key=f"cancel_new_{task}"):
@@ -237,7 +238,6 @@ def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
     test_id = c1.text_input("测试号(test_id / label)", value=default_id,
                                  key=f"nt_id_{task}")
 
-    # 用哪个版本
     ver_options = ["当前 task.yaml"] + [v.label for v in versions]
     use_ver = c2.selectbox("Prompt 版本", ver_options, index=0,
                               key=f"nt_ver_{task}")
@@ -250,19 +250,126 @@ def _render_new_test_form(task: str, task_dir: Path, versions: list) -> None:
         "跑完自动出建议", value=False, key=f"nt_ar_{task}",
         help="再 +3-5 min LLM 调用")
 
-    if prefill:
-        st.caption(f"🔁 从历史 test 复用了参数(total={prefill.get('total')})")
+    # ===== Persona 多选 + 权重 + 饼图 =====
+    st.markdown("---")
+    st.markdown("### 👥 选 persona 和权重")
+    st.caption("默认从该任务的 sampling.yaml 取;勾选/调权重做本次测试的实验,不会改任务级配置。")
 
-    if st.button("🚀 启动测试", type="primary", key=f"nt_go_{task}"):
-        # 若选了历史版本,先切到那个版本
+    sampling_path = task_dir / "sampling.yaml"
+    sampling_cfg = (load_sampling(sampling_path)
+                     if sampling_path.exists() else SamplingConfig())
+
+    persona_names = sorted(p for p in list_personas(task)
+                              if not p.startswith("adv_"))
+    if not persona_names:
+        st.warning("该任务下没有非对抗 persona,无法跑测试")
+        return
+
+    # 加载 demographics 用于显示
+    persona_info = {}
+    for pname in persona_names:
+        try:
+            p = load_persona(task_dir / "personas" / f"{pname}.yaml",
+                              personalities_dir=ROOT / "personalities",
+                              noise_file=NOISE_FILE)
+            persona_info[pname] = {
+                "mbti": p.demographics.mbti,
+                "age": p.demographics.age_range,
+                "gender": p.demographics.gender,
+                "attitude": p.demographics.attitude,
+            }
+        except Exception:
+            persona_info[pname] = {}
+
+    # 初始权重:来自 prefill(复用),否则从 sampling.yaml
+    prefill_weights = (prefill.get("weights") if prefill else None) or {}
+    default_weights = sampling_cfg.weights or {}
+
+    rows = []
+    for pname in persona_names:
+        info = persona_info.get(pname, {})
+        cur_w = float(prefill_weights.get(pname,
+                                            default_weights.get(pname, 0)))
+        rows.append({
+            "✓": cur_w > 0,
+            "persona": pname,
+            "MBTI": info.get("mbti", "—"),
+            "年龄": info.get("age", "—"),
+            "态度": info.get("attitude", "—"),
+            "权重": cur_w,
+        })
+
+    edited = st.data_editor(
+        pd.DataFrame(rows), hide_index=True, use_container_width=True,
+        column_config={
+            "✓": st.column_config.CheckboxColumn(width="small"),
+            "persona": st.column_config.TextColumn(disabled=True),
+            "MBTI": st.column_config.TextColumn(disabled=True, width="small"),
+            "年龄": st.column_config.TextColumn(disabled=True, width="small"),
+            "态度": st.column_config.TextColumn(disabled=True, width="small"),
+            "权重": st.column_config.NumberColumn(min_value=0.0, step=1.0),
+        },
+        key=f"nt_pw_{task}",
+    )
+
+    # 提取选中 + 权重
+    test_weights: dict[str, float] = {}
+    for _, r in edited.iterrows():
+        if r.get("✓") and float(r.get("权重") or 0) > 0:
+            test_weights[str(r["persona"])] = float(r["权重"])
+
+    # 饼图
+    if test_weights:
+        try:
+            import plotly.express as px
+            total_w = sum(test_weights.values())
+            pie_df = pd.DataFrame([
+                {"persona": k, "权重": v,
+                 "比例": f"{v / total_w * 100:.0f}%"}
+                for k, v in test_weights.items()
+            ])
+            pc1, pc2 = st.columns([1, 2])
+            with pc1:
+                fig = px.pie(pie_df, names="persona", values="权重",
+                              hole=0.35, height=260)
+                fig.update_traces(textinfo="label+percent")
+                fig.update_layout(margin=dict(l=0, r=0, t=0, b=0),
+                                    showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+            with pc2:
+                from claw_eval.sampling import allocate
+                alloc = allocate(test_weights, int(total))
+                ad = pd.DataFrame([
+                    {"persona": k, "权重": test_weights[k],
+                     "分配 trial": v}
+                    for k, v in sorted(alloc.items(), key=lambda x: -x[1])
+                    if v > 0
+                ])
+                st.markdown(f"**预览:total={total} 分配**")
+                st.dataframe(ad, hide_index=True, use_container_width=True)
+        except ImportError:
+            st.dataframe(pd.DataFrame(list(test_weights.items()),
+                                        columns=["persona", "权重"]),
+                          hide_index=True)
+    else:
+        st.warning("⚠ 请至少勾选一个 persona 并设权重")
+
+    if prefill:
+        st.caption(f"🔁 从历史 test 复用了参数")
+
+    st.markdown("---")
+    if st.button("🚀 启动测试", type="primary", key=f"nt_go_{task}",
+                  disabled=not test_weights):
         if use_ver != "当前 task.yaml":
             switch_to_version(task_dir, use_ver)
+        # --weights JSON 传 batch
         cmd = [sys.executable, "-m", "claw_eval.cli", "batch",
-               "--task", task, "--total", str(total), "--label", test_id]
+               "--task", task, "--total", str(total),
+               "--label", test_id,
+               "--weights", _json.dumps(test_weights, ensure_ascii=False)]
         if no_judge:
             cmd.append("--no-judge")
         env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
-        log_pane = st.empty()
         with st.spinner(f"⏳ 跑批中(预计 {total // 4 + 2} 分钟)…"):
             proc = subprocess.run(cmd, capture_output=True, text=True,
                                      env=env, cwd=str(ROOT))
