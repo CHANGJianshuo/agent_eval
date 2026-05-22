@@ -1,10 +1,36 @@
 # claw-eval-web
 
-React + Vite + Tailwind 现代前端,替代之前的 Streamlit UI。
+React + Vite + Tailwind 现代前端 (path 2,推荐)。
 
-## 跑起来
+## 跑起来 —— 两种模式
 
-需要 **Node.js ≥ 18**(WSL 自带的 v12 不够,用 Windows 端的 Node 24)。
+### 模式 A:生产模式(单端口,推荐)
+
+打包前端,FastAPI 同时托管 API + 前端 + 报告:
+
+```bash
+cd /home/chang/claw_eval/web && npm install && npm run build
+cd ..
+PYTHONPATH=src python3 -m claw_eval.cli web --port 8000
+```
+
+浏览器开 **http://localhost:8000/** —— 一个端口搞定所有。
+
+### 模式 B:开发模式(双端口,可热重载)
+
+适合改 React 代码时用,改完 Vite 自动 reload:
+
+```bash
+# 终端 1:FastAPI
+PYTHONPATH=src python3 -m claw_eval.cli web --port 8000
+
+# 终端 2:Vite dev server(改 React 代码自动重启)
+cd web && npm run dev
+```
+
+浏览器开 **http://localhost:5173/**(Vite 5173 自动 proxy /api/* 到 :8000)。
+
+需要 **Node.js ≥ 18**(WSL 自带的 v12 不够,先 `nvm install 20` 或用 Windows 端 Node 24)。
 
 ### 第一次
 

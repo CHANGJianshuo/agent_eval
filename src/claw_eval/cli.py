@@ -979,6 +979,11 @@ def web(port: int = typer.Option(8000, help="FastAPI 端口"),
 
 @app.command()
 def editor(port: int = typer.Option(8501, help="Streamlit 端口")):
+    """[legacy] 启动 Streamlit 编辑器。
+
+    ⚠ Streamlit UI 已**冻结开发**,新功能只在 React UI (`claw-eval web`) 加。
+    保留是为了 fallback,不需要装 Node.js。
+    """
     """启动 Persona 编辑器(Streamlit 网页)—— 选性格、画状态机、配 noise、保存 YAML。
 
     需要先装 ui 依赖:`pip install -e ".[ui]"`(streamlit + pandas)。

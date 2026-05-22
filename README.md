@@ -35,9 +35,23 @@
 ```bash
 git clone https://github.com/CHANGJianshuo/agent_eval claw_eval
 cd claw_eval
-pip install -e '.[dev,ui]'        # 引擎 + 测试 + Streamlit 编辑器
-export XIAOMI_MIMO_API_KEY=...     # 或别的 LLM 提供商(改 configs/models.yaml)
+
+# 推荐:Web UI(React + FastAPI,现代界面)
+pip install -e '.[dev,web]'
+cd web && npm install && npm run build && cd ..
+PYTHONPATH=src python3 -m claw_eval.cli web    # http://localhost:8000
+
+# 或:Streamlit UI(legacy,不需要 Node.js)
+pip install -e '.[dev,ui]'
+PYTHONPATH=src python3 -m claw_eval.cli editor    # http://localhost:8501
+
+# API key 在 UI 里配,或:
+export XIAOMI_MIMO_API_KEY=...
 ```
+
+> **两套 UI 怎么选**:
+> - **React UI**(`claw-eval web`)是**主推 / 持续开发**的版本,Linear/Vercel 风格,需要 Node.js 18+
+> - **Streamlit UI**(`claw-eval editor`)是 **legacy**,已冻结开发,只保留给不想装 Node 的用户作 fallback。
 
 ### 跑一个最小 demo
 
