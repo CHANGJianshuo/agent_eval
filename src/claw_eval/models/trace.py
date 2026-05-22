@@ -61,3 +61,5 @@ class GradingResult(BaseModel):
     rubric_scores: list[RubricScore] = Field(default_factory=list)
     violations: list[Violation] = Field(default_factory=list)
     trace_path: str | None = None
+    # 当 batch 用 --dimensions 模式时,记录该 case 实际采到的维度组合
+    demographics: dict[str, str] = Field(default_factory=dict)

@@ -84,19 +84,25 @@ def _echo_result(result, prefix: str = "") -> None:
 def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
                    persona_name: str, trial_idx: int, total_trials: int,
                    cfg: dict, judge, run_id: str,
-                   noise_overlay_kinds: list = None) -> float:
+                   noise_overlay_kinds: list = None,
+                   persona_override=None) -> float:
     """跑一个 trial(线程安全:每个 trial 各自的 trace 路径)。
 
     输出落到 traces/<run_id>/ 子目录,便于按 run 分组回归对比。
 
     noise_overlay_kinds: 若非 None,本 trial 为「噪音 case」,临时把 persona 的
                         noise_rate 强制为 1.0,kinds 用 overlay 配置(每轮必加噪)。
+    persona_override:   若非 None,直接用这个 Persona 对象(--dimensions 模式
+                        从 persona_factory 生成的实例),persona_name 仍用 id。
     """
-    persona_obj = load_persona(
-        task_dir / "personas" / f"{persona_name}.yaml",
-        personalities_dir=_ROOT / "personalities",
-        noise_file=_ROOT / "configs" / "noise_profiles.yaml",
-    )
+    if persona_override is not None:
+        persona_obj = persona_override
+    else:
+        persona_obj = load_persona(
+            task_dir / "personas" / f"{persona_name}.yaml",
+            personalities_dir=_ROOT / "personalities",
+            noise_file=_ROOT / "configs" / "noise_profiles.yaml",
+        )
     if noise_overlay_kinds:
         # 这通是「噪音 case」:全程必噪(rate=1.0),kinds 用 overlay 指定的
         from .models.persona import load_noise_kinds
@@ -123,6 +129,11 @@ def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
     )
     result = _grade_trace(trace_path, task_def, rubrics, judge)
     result.persona_id = persona_obj.id
+    # 记录该 case 实际的 demographics(若有)
+    try:
+        result.demographics = persona_obj.demographics.model_dump()
+    except Exception:
+        pass
 
     out_path = trace_path.with_suffix(".result.json")
     out_path.write_text(
@@ -183,7 +194,11 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
           label: str = typer.Option(
               "", help="run_id 标签(回归对比用);默认时间戳"),
           weights: str = typer.Option(
-              "", help='JSON 字典 override sampling.yaml weights,如 \'{"cooperative":50,"refuse":20}\'')):
+              "", help='JSON 字典 override sampling.yaml weights,如 \'{"cooperative":50,"refuse":20}\''),
+          dimensions: str = typer.Option(
+              "", help='JSON 5 维度比例字典 → persona_factory 独立采样生成 persona。'
+                      '例:\'{"attitude":{"cooperative":60,"refuse":40},'
+                      '"age_range":{"30-39":100}}\'')):
     """跑「多 persona × N trials」,case 间并行;跑完自动出 dashboard。
 
     两种模式:
@@ -199,8 +214,38 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
 
     n_workers = concurrency or int(cfg.get("concurrency", 4))
 
-    noise_overlay_for_idx: dict[int, list] = {}
-    if total > 0:
+    # ============== --dimensions 模式 ==============
+    # 优先级最高:走 persona_factory 随机生成,不读 sampling.yaml
+    generated_personas: list = []
+    if dimensions:
+        import json as _json
+        try:
+            dim_cfg = _json.loads(dimensions)
+        except Exception as exc:
+            typer.echo(f"[error] --dimensions 解析失败:{exc}")
+            raise typer.Exit(1)
+        if total <= 0:
+            typer.echo("[error] --dimensions 必须配合 --total N")
+            raise typer.Exit(1)
+        from .persona_factory import generate_personas
+        try:
+            generated_personas = generate_personas(
+                dim_cfg, task_dir, n=total,
+                seed=abs(hash(label or "")) & 0xFFFFFFFF)
+        except Exception as exc:
+            typer.echo(f"[error] persona 生成失败:{exc}")
+            raise typer.Exit(1)
+        typer.echo(f"[batch · 维度采样] {task_def.task_id}: total={total} → "
+                   f"{len(generated_personas)} 个生成 persona,并发 {n_workers}")
+        # 把生成的 persona 作为 pairs,name 用 id,trial_idx 用 0
+        names = list({p.id for p in generated_personas})  # 集合,可能重复
+        pairs = [(p.id, i) for i, p in enumerate(generated_personas)]
+        noise_overlay_for_idx: dict[int, list] = {}
+    else:
+        noise_overlay_for_idx = {}
+    if dimensions:
+        pass    # 上面已处理
+    elif total > 0:
         # 比例分配模式
         from .sampling import allocate, load_sampling, select_noise_cases
         samp_file = task_dir / "sampling.yaml"
@@ -275,10 +320,18 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"  (DB 写入失败 → 跳过历史索引:{exc})")
 
+    # 索引 → 生成的 persona 对象(--dimensions 模式)
+    persona_map: dict[int, object] = {}
+    if generated_personas:
+        for i, p in enumerate(generated_personas):
+            persona_map[i] = p
+
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         futures = {
             ex.submit(_run_one_trial, task_dir, task_def, rubrics,
-                      name, i, trials, cfg, judge, run_id): (name, i)
+                      name, i, trials, cfg, judge, run_id,
+                      noise_overlay_for_idx.get(i),
+                      persona_map.get(i)): (name, i)
             for name, i in pairs
         }
         done = 0

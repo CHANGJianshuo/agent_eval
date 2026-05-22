@@ -55,9 +55,15 @@ export interface NewTestRequest {
   test_id?: string
   total: number
   no_judge?: boolean
-  weights: Record<string, number>
+  weights?: Record<string, number>
+  dimensions?: Record<string, Record<string, number>>
   auto_recommend?: boolean
   prompt_version?: string | null
+}
+
+export interface PreviewResult {
+  distribution: Record<string, Record<string, number>>
+  samples: Array<Record<string, string>>
 }
 
 export interface JobStatus {
@@ -123,6 +129,10 @@ export const TestsAPI = {
     api.get<TestInfo>(`/tests/${testId}`).then(r => r.data),
   start: (taskId: string, req: NewTestRequest) =>
     api.post<JobStatus>(`/tasks/${taskId}/tests`, req).then(r => r.data),
+  previewPersonas: (taskId: string, dimensions: Record<string, Record<string, number>>, n = 30, seed = 0) =>
+    api.post<PreviewResult>(`/tasks/${taskId}/preview-personas`, {
+      dimensions, n, seed,
+    }).then(r => r.data),
 }
 
 export const PersonaLibAPI = {

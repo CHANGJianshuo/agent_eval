@@ -47,9 +47,21 @@ class NewTestRequest(BaseModel):
     test_id: str = ""                    # 留空则自动生成
     total: int = 30
     no_judge: bool = False
-    weights: dict[str, float] = {}       # persona -> weight
+    weights: dict[str, float] = {}       # persona -> weight (legacy)
+    dimensions: dict[str, dict[str, float]] = {}   # 5 维度比例 → persona_factory
     auto_recommend: bool = False
     prompt_version: str | None = None    # 用某历史版本
+
+
+class PreviewRequest(BaseModel):
+    dimensions: dict[str, dict[str, float]]
+    n: int = 30
+    seed: int = 0
+
+
+class PreviewResult(BaseModel):
+    distribution: dict[str, dict[str, int]]    # 每维度实际命中
+    samples: list[dict[str, str]]              # 前 N 个样本的 demographics
 
 
 class JobStatus(BaseModel):
@@ -136,7 +148,11 @@ def start_test(task_id: str, req: NewTestRequest, background: BackgroundTasks):
                    "--label", test_id]
             if req.no_judge:
                 cmd.append("--no-judge")
-            if req.weights:
+            if req.dimensions:
+                # 维度模式 → persona_factory(优先)
+                cmd += ["--dimensions",
+                          json.dumps(req.dimensions, ensure_ascii=False)]
+            elif req.weights:
                 cmd += ["--weights", json.dumps(req.weights, ensure_ascii=False)]
             env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
             proc = subprocess.run(cmd, capture_output=True, text=True,
@@ -168,6 +184,25 @@ def get_test_job(job_id: str):
     j = _TEST_JOBS[job_id]
     return JobStatus(job_id=job_id, status=j["status"],
                       message=str(j.get("log", ""))[-1500:])
+
+
+@router.post("/tasks/{task_id}/preview-personas", response_model=PreviewResult)
+def preview_personas(task_id: str, req: PreviewRequest):
+    """预览:按 dimensions 比例采样 N 次,看实际分布 + 前几个样本。"""
+    from ..persona_factory import (
+        generate_personas, preview_distribution,
+    )
+    if not (TASKS_DIR / task_id).exists():
+        raise HTTPException(404, f"任务 {task_id} 不存在")
+    try:
+        dist = preview_distribution(req.dimensions, req.n, seed=req.seed)
+        personas = generate_personas(
+            req.dimensions, TASKS_DIR / task_id, n=min(req.n, 10),
+            seed=req.seed)
+        samples = [p.demographics.model_dump() for p in personas]
+        return PreviewResult(distribution=dist, samples=samples)
+    except Exception as exc:
+        raise HTTPException(500, str(exc))
 
 
 @router.get("/tasks/{task_id}/recommendations")
