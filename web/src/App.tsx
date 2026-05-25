@@ -15,17 +15,17 @@ function DemoBanner() {
   useEffect(() => { isBackendAvailable().then(ok => setIsDemo(!ok)) }, [])
   if (isDemo !== true) return null
   return (
-    <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs">
+    <div className="bg-amber-50 border-b border-amber-200 px-5 py-1 text-[11px]">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="text-amber-900">
-          🌐 <strong>Demo 模式</strong> · GitHub Pages 静态托管 · 数据是脱敏样本,「新建任务/启动测试」等操作不会执行
+          <strong>Demo</strong> · GitHub Pages 静态托管 · 样本数据 · 写操作不执行
         </div>
         <a
           href="https://github.com/CHANGJianshuo/agent_eval"
           target="_blank" rel="noopener"
           className="text-amber-900 hover:underline font-medium ml-4"
         >
-          完整源码 ↗
+          源码 ↗
         </a>
       </div>
     </div>
@@ -39,7 +39,7 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
       to={to}
       className={({ isActive }) =>
         cn(
-          'px-3 py-1.5 text-sm font-medium rounded-md',
+          'px-2.5 py-1 text-[13px] font-medium rounded',
           'transition-colors',
           isActive
             ? 'text-foreground bg-accent'
@@ -57,20 +57,20 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <DemoBanner />
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-primary text-primary-foreground
-                              flex items-center justify-center font-bold text-xs">
+      <header className="sticky top-0 z-50 bg-background/85 backdrop-blur border-b border-border">
+        <div className="max-w-7xl mx-auto px-5 h-10 flex items-center justify-between">
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded bg-primary text-primary-foreground
+                              flex items-center justify-center font-bold text-[10px]">
                 D
               </div>
-              <span className="font-semibold text-sm">DialAgentEval</span>
+              <span className="font-semibold text-[13px]">DialAgentEval</span>
             </div>
-            <nav className="flex items-center gap-1">
+            <nav className="flex items-center gap-0.5">
               <NavItem to="/">任务</NavItem>
-              <NavItem to="/settings">全局配置</NavItem>
-              <NavItem to="/docs">使用文档</NavItem>
+              <NavItem to="/settings">配置</NavItem>
+              <NavItem to="/docs">文档</NavItem>
             </nav>
           </div>
           <div className="flex items-center gap-2">
@@ -78,14 +78,14 @@ function Layout({ children }: { children: React.ReactNode }) {
               href="http://localhost:8000/docs"
               target="_blank"
               rel="noopener"
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-[11px] text-muted-foreground hover:text-foreground"
             >
-              API Docs ↗
+              API ↗
             </a>
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-6 py-6">{children}</main>
+      <main className="max-w-7xl mx-auto px-5 py-4">{children}</main>
     </div>
   )
 }

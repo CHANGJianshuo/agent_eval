@@ -41,46 +41,46 @@ export default function TaskList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Title row */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">任务</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {tasks.length} 个任务,管理每个任务的多次测试
+          <h1 className="text-lg font-semibold tracking-tight">任务</h1>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            {tasks.length} 个任务 · 管理每个任务的多次测试
           </p>
         </div>
-        <Button variant="primary" size="md" onClick={() => setShowNew(true)}>
-          <Plus size={14} /> 新建任务
+        <Button variant="primary" size="sm" onClick={() => setShowNew(true)}>
+          <Plus size={12} /> 新建任务
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* Stats - compact */}
+      <div className="grid grid-cols-4 gap-2">
         {[
           { label: '任务数', value: tasks.length },
           { label: '总测试', value: tasks.reduce((s, t) => s + t.n_tests, 0) },
           { label: 'Persona', value: tasks.reduce((s, t) => s + t.n_personas + t.n_adv_personas, 0) },
           { label: 'Rubric',  value: tasks.reduce((s, t) => s + t.n_rubrics, 0) },
         ].map(it => (
-          <Card key={it.label} className="px-4 py-3">
-            <div className="text-xs text-muted-foreground">{it.label}</div>
-            <div className="text-2xl font-semibold mt-1 tracking-tight">{it.value}</div>
+          <Card key={it.label} className="px-3 py-2">
+            <div className="text-[11px] text-muted-foreground">{it.label}</div>
+            <div className="text-lg font-semibold mt-0.5 tracking-tight">{it.value}</div>
           </Card>
         ))}
       </div>
 
       {/* Toolbar */}
       {selected.size > 0 && (
-        <div className="flex items-center justify-between p-2 px-3 rounded-md
-                          border border-border bg-accent/40 text-sm">
+        <div className="flex items-center justify-between px-3 py-1.5 rounded
+                          border border-border bg-accent/40 text-[12px]">
           <span>已选 {selected.size} 个</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
               取消
             </Button>
             <Button variant="destructive" size="sm" onClick={removeSelected}>
-              <Trash2 size={12} /> 删除选中
+              <Trash2 size={11} /> 删除选中
             </Button>
           </div>
         </div>
@@ -88,20 +88,20 @@ export default function TaskList() {
 
       {/* Task list */}
       {isLoading ? (
-        <Card className="p-12 flex items-center justify-center text-muted-foreground">
-          <Loader2 className="animate-spin mr-2" size={16} /> 加载中…
+        <Card className="p-8 flex items-center justify-center text-muted-foreground text-sm">
+          <Loader2 className="animate-spin mr-2" size={14} /> 加载中…
         </Card>
       ) : tasks.length === 0 ? (
-        <Card className="p-12 text-center">
-          <div className="text-sm text-muted-foreground mb-4">
+        <Card className="p-8 text-center">
+          <div className="text-sm text-muted-foreground mb-3">
             还没有任务,点右上「新建任务」开始
           </div>
           <Button variant="primary" onClick={() => setShowNew(true)}>
-            <Plus size={14} /> 新建任务
+            <Plus size={12} /> 新建任务
           </Button>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {tasks.map(t => (
             <TaskRow
               key={t.task_id}
@@ -129,62 +129,60 @@ function TaskRow({ task, selected, onToggle }: {
 
   return (
     <Card className="hover:border-foreground/20 transition-colors group">
-      <div className="px-5 py-4 flex items-center gap-4">
+      <div className="px-4 py-2.5 flex items-center gap-3">
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggle}
-          className="w-4 h-4 rounded border-border accent-foreground"
+          className="w-3.5 h-3.5 rounded border-border accent-foreground"
         />
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link
               to={`/tasks/${task.task_id}`}
-              className="font-mono text-sm font-medium hover:underline"
+              className="font-mono text-[13px] font-medium hover:underline"
             >
               {task.task_id}
             </Link>
             {task.n_adv_personas > 0 && (
-              <Badge variant="danger">
-                {task.n_adv_personas} 对抗 persona
-              </Badge>
+              <Badge variant="danger">{task.n_adv_personas} 对抗</Badge>
             )}
             {task.n_versions > 0 && (
               <Badge>v{task.n_versions}</Badge>
             )}
           </div>
           {task.description && (
-            <div className="text-sm text-muted-foreground mt-1 truncate max-w-xl">
+            <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-xl">
               {task.description}
             </div>
           )}
-          <div className="mt-2.5">
+          <div className="mt-1.5">
             <MilestoneProgress milestones={task.milestones} />
           </div>
         </div>
 
-        <div className="flex items-center gap-8 text-sm">
+        <div className="flex items-center gap-6 text-[12px]">
           <div className="text-right">
-            <div className="text-muted-foreground text-xs">Rubric / Persona</div>
-            <div className="font-medium mt-0.5">
-              {task.n_rubrics} <span className="text-muted-foreground">·</span> {task.n_personas}
+            <div className="text-muted-foreground text-[10px]">R / P</div>
+            <div className="font-medium mt-0.5 tabular-nums">
+              {task.n_rubrics}<span className="text-muted-foreground mx-1">·</span>{task.n_personas}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-muted-foreground text-xs">测试</div>
-            <div className="font-medium mt-0.5">{task.n_tests}</div>
+            <div className="text-muted-foreground text-[10px]">测试</div>
+            <div className="font-medium mt-0.5 tabular-nums">{task.n_tests}</div>
           </div>
           <div className="text-right">
-            <div className="text-muted-foreground text-xs">通过率</div>
-            <div className={`text-lg font-semibold mt-0.5 ${passColor}`}>
+            <div className="text-muted-foreground text-[10px]">通过率</div>
+            <div className={`text-base font-semibold mt-0.5 tabular-nums ${passColor}`}>
               {task.last_pass_rate == null ? '—' :
                 `${Math.round(task.last_pass_rate * 100)}%`}
             </div>
           </div>
           <Link to={`/tasks/${task.task_id}`}>
-            <Button variant="outline" size="md">
-              进入 <ArrowRight size={12} />
+            <Button variant="outline" size="sm">
+              进入 <ArrowRight size={11} />
             </Button>
           </Link>
         </div>
