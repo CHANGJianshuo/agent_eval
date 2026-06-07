@@ -35,14 +35,34 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
   const [noJudge, setNoJudge] = useState(false)
   const [autoRec, setAutoRec] = useState(false)
 
-  // 5 维度的比例:{ attitude: {cooperative: 60, refuse: 40}, ... }
+  // 各维度的比例:{ attitude: {cooperative: 60, refuse: 40}, ... }
   const [dims, setDims] = useState<AllDims>({
     attitude: { cooperative: 60, refuse: 30, hesitant: 10 },
-    mbti: {},        // 空 = 不限,默认 unspecified
+    mbti: {},
     gender: {},
     age_range: {},
     education: {},
   })
+  // 哪些维度「启用」参与采样(默认只开性格,其余按需勾)
+  const [enabledDims, setEnabledDims] = useState<Set<string>>(
+    new Set(['attitude']))
+
+  const toggleDimEnabled = (key: string) => {
+    setEnabledDims(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  // 实际提交/预览用的维度:只含启用且配了比例的
+  const activeDims = useMemo(() => {
+    const out: AllDims = {}
+    for (const k of enabledDims) {
+      if (dims[k] && Object.keys(dims[k]).length > 0) out[k] = dims[k]
+    }
+    return out
+  }, [dims, enabledDims])
 
   const { data: lib } = useQuery({
     queryKey: ['persona-library'],
@@ -52,7 +72,7 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
   // 预览
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const previewMut = useMutation({
-    mutationFn: () => TestsAPI.previewPersonas(taskId, dims, total),
+    mutationFn: () => TestsAPI.previewPersonas(taskId, activeDims, total),
     onSuccess: (r) => setPreview(r),
   })
 
@@ -66,9 +86,7 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
     },
   })
 
-  const hasAnyDim = useMemo(
-    () => Object.values(dims).some(d => Object.values(d).some(v => v > 0)),
-    [dims])
+  const hasAnyDim = Object.keys(activeDims).length > 0
 
   return (
     <div className="space-y-5">
@@ -127,9 +145,9 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
       {/* 5 维度区 */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">维度比例</h3>
+          <h3 className="text-sm font-semibold">维度配置</h3>
           <div className="text-xs text-muted-foreground">
-            每维度独立采样;空白维度系统填 unspecified
+            勾选要测的维度 · 各维度独立采样交叉组合 · 未启用的维度不参与
           </div>
         </div>
 
@@ -140,6 +158,8 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
             label={dim.label}
             options={dim.values.map(v => ({ value: v.value, label: v.label, desc: v.desc }))}
             current={dims[dim.dim] || {}}
+            enabled={enabledDims.has(dim.dim)}
+            onToggleEnabled={() => toggleDimEnabled(dim.dim)}
             onChange={next => setDims({ ...dims, [dim.dim]: next })}
           />
         ))}
@@ -181,7 +201,7 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
             onClick={() => startMut.mutate({
               test_id: testId,
               total, no_judge: noJudge,
-              dimensions: dims,
+              dimensions: activeDims,
               auto_recommend: autoRec,
             })}
           >
@@ -213,10 +233,12 @@ interface DimBlockProps {
   label: string
   options: { value: string; label: string; desc: string }[]
   current: DimWeights
+  enabled: boolean
+  onToggleEnabled: () => void
   onChange: (next: DimWeights) => void
 }
 
-function DimensionBlock({ label, options, current, onChange }: DimBlockProps) {
+function DimensionBlock({ label, options, current, enabled, onToggleEnabled, onChange }: DimBlockProps) {
   const total = Object.values(current).reduce((s, v) => s + v, 0)
   const pieData = Object.entries(current)
     .filter(([_, v]) => v > 0)
@@ -243,21 +265,38 @@ function DimensionBlock({ label, options, current, onChange }: DimBlockProps) {
   }
 
   return (
-    <div className="border border-border rounded-lg p-4">
+    <div className={`border rounded-lg p-4 transition-colors
+                      ${enabled ? 'border-border' : 'border-border/50 bg-muted/20'}`}>
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold">{label}</h4>
-          <span className="text-xs text-muted-foreground">
-            {Object.keys(current).length} / {options.length} 选 · 总比例 {total}
+        <button
+          onClick={onToggleEnabled}
+          className="flex items-center gap-2 group"
+        >
+          {/* toggle switch */}
+          <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full
+                            transition-colors ${enabled ? 'bg-foreground' : 'bg-border'}`}>
+            <span className={`inline-block h-3 w-3 transform rounded-full bg-background
+                              transition-transform ${enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
           </span>
-        </div>
-        {Object.keys(current).length > 0 && (
+          <h4 className={`text-sm font-semibold ${enabled ? '' : 'text-muted-foreground'}`}>
+            {label}
+          </h4>
+          {enabled ? (
+            <span className="text-xs text-muted-foreground">
+              {Object.keys(current).length} / {options.length} 选 · 总 {total}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">未启用(不参与采样)</span>
+          )}
+        </button>
+        {enabled && Object.keys(current).length > 0 && (
           <Button variant="ghost" size="sm" onClick={() => onChange({})}>
             清空
           </Button>
         )}
       </div>
 
+      {!enabled ? null : (
       <div className="grid grid-cols-[1fr_180px] gap-4">
         {/* 属性勾选 + 比例 */}
         <div className="grid grid-cols-2 gap-1.5">
@@ -343,6 +382,7 @@ function DimensionBlock({ label, options, current, onChange }: DimBlockProps) {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

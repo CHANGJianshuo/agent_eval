@@ -116,6 +116,33 @@ def find_default_script(task_dir: Path) -> Persona | None:
     return None
 
 
+def find_all_scripts(task_dir: Path) -> list[Persona]:
+    """选任务下**所有非 adv** persona 作为剧本池。
+
+    跑批时把这些剧本轮询分配给采样出的 persona,让不同 persona 走
+    不同流程路径,覆盖更全(对抗 adv_* 剧本不进池,它们是安全红队专用)。
+    """
+    pdir = task_dir / "personas"
+    if not pdir.exists():
+        return []
+    scripts = []
+    for f in sorted(pdir.glob("*.yaml")):
+        if f.stem.startswith("adv_"):
+            continue
+        try:
+            scripts.append(load_persona(f))
+        except Exception:
+            continue
+    # 一个非 adv 都没有 → 退回用对抗剧本(至少有骨架)
+    if not scripts:
+        for f in sorted(pdir.glob("*.yaml")):
+            try:
+                scripts.append(load_persona(f))
+            except Exception:
+                continue
+    return scripts
+
+
 def build_persona(demo: Demographics,
                   script: Persona,
                   idx: int) -> Persona:
@@ -148,17 +175,21 @@ def generate_personas(dimensions: dict[str, dict[str, float]],
                       seed: int = 0) -> list[Persona]:
     """主入口:按维度比例独立采样 n 个 persona。
 
-    每个维度按权重采样;返回的 Persona 都用任务的默认剧本。
+    剧本(状态机/探针)从 personas/ 里**所有非 adv 剧本**轮询分配,
+    让 n 个 persona 走不同流程路径、覆盖更全;demographics 按各维度
+    独立采样。每个维度只接受非空权重,留空维度自动填 unspecified。
     """
     task_dir = Path(task_dir)
-    script = find_default_script(task_dir)
-    if script is None:
+    scripts = find_all_scripts(task_dir)
+    if not scripts:
         raise ValueError(f"任务 {task_dir} 下没有可用剧本(personas/ 全空?)")
 
     rng = random.Random(seed)
     out = []
     for i in range(n):
         demo = sample_demographics(dimensions, rng)
+        # 轮询分配剧本:第 i 个 persona 用第 (i % 剧本数) 个剧本
+        script = scripts[i % len(scripts)]
         out.append(build_persona(demo, script, i))
     return out
 
