@@ -136,6 +136,45 @@ def start_test(task_id: str, req: NewTestRequest, background: BackgroundTasks):
     if not (TASKS_DIR / task_id).exists():
         raise HTTPException(404, f"任务 {task_id} 不存在")
 
+    td = TASKS_DIR / task_id
+
+    # ── 自动应用草稿(draft → final) ──
+    import shutil
+    draft_r = td / "rubrics.draft.yaml"
+    final_r = td / "rubrics.yaml"
+    if draft_r.exists():
+        shutil.copy2(draft_r, final_r)
+    draft_p = td / "personas_draft"
+    final_p = td / "personas"
+    if draft_p.exists():
+        final_p.mkdir(exist_ok=True)
+        for f in draft_p.glob("*.yaml"):
+            shutil.copy2(f, final_p / f.name)
+
+    # ── 配置预检 ──
+    errors = []
+    if not (td / "task.yaml").exists():
+        errors.append("缺少 task.yaml（任务 Prompt）")
+    if not final_r.exists():
+        errors.append("缺少评分项（rubrics.yaml 和 rubrics.draft.yaml 都不存在）")
+    else:
+        try:
+            import yaml
+            with open(final_r, encoding="utf-8") as f:
+                rd = yaml.safe_load(f)
+            if not rd or not rd.get("rubrics"):
+                errors.append("rubrics.yaml 内容为空")
+        except Exception as e:
+            errors.append(f"rubrics.yaml 解析失败: {e}")
+    scripts_dir = td / "personas"
+    n_scripts = len(list(scripts_dir.glob("*.yaml"))) if scripts_dir.exists() else 0
+    if n_scripts == 0:
+        errors.append("缺少剧本（personas/ 目录为空）")
+    if not (td / "grader.py").exists():
+        errors.append("缺少评分器（grader.py）")
+    if errors:
+        raise HTTPException(422, "配置预检失败:\n" + "\n".join(f"• {e}" for e in errors))
+
     test_id = req.test_id or f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     job_id = f"test_{test_id}"
     _TEST_JOBS[job_id] = {"status": "running", "task_id": task_id,
@@ -161,6 +200,15 @@ def start_test(task_id: str, req: NewTestRequest, background: BackgroundTasks):
             if proc.returncode != 0:
                 _TEST_JOBS[job_id]["status"] = "failed"
                 return
+            # 为本次 run 单独生成报告
+            try:
+                from ..report.builder import build_dashboard_from_dir
+                run_traces = ROOT / "traces" / test_id
+                run_report = REPORTS_DIR / test_id
+                run_report.mkdir(parents=True, exist_ok=True)
+                build_dashboard_from_dir(run_traces, run_report)
+            except Exception:
+                pass
             if req.auto_recommend:
                 rp = subprocess.run(
                     [sys.executable, "-m", "claw_eval.cli", "recommend",
@@ -203,6 +251,104 @@ def preview_personas(task_id: str, req: PreviewRequest):
         return PreviewResult(distribution=dist, samples=samples)
     except Exception as exc:
         raise HTTPException(500, str(exc))
+
+
+@router.get("/tests/{test_id}/results")
+def get_test_results(test_id: str):
+    """读取测试的全部 case 结果,用于展示分布和明细。"""
+    traces_dir = ROOT / "traces" / test_id
+    if not traces_dir.exists():
+        return {"results": [], "heatmap": [], "scripts": [], "attitudes": []}
+
+    results = []
+    for rf in sorted(traces_dir.glob("*.result.json")):
+        try:
+            d = json.loads(rf.read_text(encoding="utf-8"))
+            results.append(d)
+        except Exception:
+            continue
+
+    # 构建 script × attitude 矩阵
+    cells: dict[tuple[str, str], list[float]] = {}
+    all_scripts: set[str] = set()
+    all_attitudes: set[str] = set()
+    for r in results:
+        sid = r.get("script_id") or r.get("persona_id", "unknown")
+        demo = r.get("demographics", {})
+        att = demo.get("attitude", "unknown")
+        all_scripts.add(sid)
+        all_attitudes.add(att)
+        cells.setdefault((sid, att), []).append(r.get("task_score", 0))
+
+    scripts = sorted(all_scripts)
+    attitudes = sorted(all_attitudes)
+    heatmap = []
+    for sid in scripts:
+        for att in attitudes:
+            scores = cells.get((sid, att), [])
+            if scores:
+                heatmap.append({
+                    "script": sid,
+                    "attitude": att,
+                    "count": len(scores),
+                    "avg_score": round(sum(scores) / len(scores), 3),
+                    "passed": sum(1 for s in scores if s >= 0.6),
+                })
+
+    return {
+        "results": results,
+        "scripts": scripts,
+        "attitudes": attitudes,
+        "heatmap": heatmap,
+    }
+
+
+@router.post("/tests/{test_id}/report")
+def generate_test_report(test_id: str, background: BackgroundTasks):
+    """为单次测试生成 HTML 报告(只读该 run 的 traces）。"""
+    traces_dir = ROOT / "traces" / test_id
+    if not traces_dir.exists():
+        raise HTTPException(404, f"traces/{test_id} 不存在")
+
+    n_results = len(list(traces_dir.glob("*.result.json")))
+    if n_results == 0:
+        raise HTTPException(422, "该测试没有评分结果（.result.json），无法生成报告")
+
+    run_report_dir = REPORTS_DIR / test_id
+    job_key = f"report_{test_id}"
+    _TEST_JOBS[job_key] = {"status": "running", "task_id": "", "test_id": test_id, "log": []}
+
+    def _build():
+        try:
+            from ..report.builder import build_dashboard_from_dir
+            run_report_dir.mkdir(parents=True, exist_ok=True)
+            build_dashboard_from_dir(traces_dir, run_report_dir)
+            _TEST_JOBS[job_key]["status"] = "done"
+        except Exception as exc:
+            _TEST_JOBS[job_key]["status"] = "failed"
+            _TEST_JOBS[job_key]["log"] = str(exc)
+
+    background.add_task(_build)
+    return {"status": "generating", "report_dir": str(run_report_dir)}
+
+
+@router.get("/tests/{test_id}/report-status")
+def get_test_report_status(test_id: str):
+    """检查单次测试的报告是否存在。"""
+    run_report_dir = REPORTS_DIR / test_id
+    # 按 run 目录查看是否有 task 页面
+    pages = sorted(run_report_dir.glob("task_*.html")) if run_report_dir.exists() else []
+    if pages:
+        return {"exists": True, "url": f"/reports/{test_id}/{pages[0].name}"}
+
+    # 后备：全局报告
+    r = get_run(test_id)
+    if r:
+        global_page = REPORTS_DIR / f"task_{r['task_id']}.html"
+        if global_page.exists():
+            return {"exists": True, "url": f"/reports/task_{r['task_id']}.html"}
+
+    return {"exists": False, "url": None}
 
 
 @router.get("/tasks/{task_id}/recommendations")

@@ -37,6 +37,12 @@ class ModelsConfig(BaseModel):
     sut: ModelRole = ModelRole()
     simulator: ModelRole = ModelRole()
     judge: ModelRole = ModelRole(temperature=0.0, reasoning_effort="medium")
+    extract_rubric: ModelRole | None = None
+    extract_personas: ModelRole | None = None
+    extract_flow: ModelRole | None = None
+    extract_variables: ModelRole | None = None
+    recommend: ModelRole | None = None
+    apply_patch: ModelRole | None = None
     concurrency: int = 4
 
 
@@ -50,27 +56,45 @@ class TestConnReq(BaseModel):
     api_key: str | None = None
 
 
-@router.get("/config/models", response_model=ModelsConfig)
+_STEP_KEYS = ["extract_rubric", "extract_personas", "extract_flow",
+              "extract_variables", "recommend", "apply_patch"]
+
+
+@router.get("/config/models")
 def get_models():
     if not MODELS_FILE.exists():
-        return ModelsConfig()
+        return ModelsConfig().model_dump()
     try:
         d = yaml.safe_load(MODELS_FILE.read_text(encoding="utf-8")) or {}
     except Exception as e:
         raise HTTPException(500, str(e))
-    return ModelsConfig(
+    out = ModelsConfig(
         sut=ModelRole(**d.get("sut", {})),
         simulator=ModelRole(**d.get("simulator", {})),
         judge=ModelRole(**d.get("judge", {})),
         concurrency=int(d.get("concurrency", 4)),
     )
+    for k in _STEP_KEYS:
+        if k in d and isinstance(d[k], dict):
+            setattr(out, k, ModelRole(**d[k]))
+    return out
 
 
 @router.put("/config/models")
 def update_models(cfg: ModelsConfig):
+    # 读已有 yaml 保留 provider 段(前端不编辑 provider)
+    existing = {}
+    if MODELS_FILE.exists():
+        try:
+            existing = yaml.safe_load(MODELS_FILE.read_text(encoding="utf-8")) or {}
+        except Exception:
+            pass
+    data = cfg.model_dump(exclude_none=True)
+    if "provider" in existing:
+        data["provider"] = existing["provider"]
     MODELS_FILE.parent.mkdir(parents=True, exist_ok=True)
     MODELS_FILE.write_text(
-        yaml.safe_dump(cfg.model_dump(), allow_unicode=True,
+        yaml.safe_dump(data, allow_unicode=True,
                        sort_keys=False, default_flow_style=False),
         encoding="utf-8")
     return {"ok": True}
@@ -95,25 +119,31 @@ def save_api_key(req: ApiKeyReq):
 
 @router.get("/config/api-keys")
 def list_api_keys():
-    """返回各 provider 是否已配 key(masked)。"""
-    out = {}
-    keys = {}
+    """返回各 provider 是否已配 key(masked)。
+
+    内置 provider 有对应环境变量;用户自定义的 provider 只查本地存储。
+    """
+    out: dict[str, str | None] = {}
+    keys: dict = {}
     if KEYS_FILE.exists():
         try:
             keys = yaml.safe_load(KEYS_FILE.read_text(encoding="utf-8")) or {}
         except Exception:
             pass
     env_map = {
+        "deepseek": "DEEPSEEK_API_KEY",
         "xiaomi_mimo": "XIAOMI_MIMO_API_KEY",
         "openai": "OPENAI_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
     }
+    # 内置 provider:查环境变量 + 本地存储
     for prov, env_var in env_map.items():
         key = keys.get(prov) or os.environ.get(env_var)
-        if key:
-            out[prov] = "*" * 8 + key[-6:]
-        else:
-            out[prov] = None
+        out[prov] = ("*" * 8 + key[-6:]) if key else None
+    # 用户自定义 provider:只查本地存储
+    for prov, key in keys.items():
+        if prov not in out and key:
+            out[prov] = "*" * 8 + str(key)[-6:]
     return out
 
 
@@ -130,12 +160,15 @@ def test_connection(req: TestConnReq):
             pass
     if not key:
         raise HTTPException(400, "未提供 api_key 且本地也没存")
-    if req.provider == "xiaomi_mimo":
-        env["XIAOMI_MIMO_API_KEY"] = key
-    elif req.provider == "openai":
-        env["OPENAI_API_KEY"] = key
-    elif req.provider == "anthropic":
-        env["ANTHROPIC_API_KEY"] = key
+    provider_env_map = {
+        "deepseek": "DEEPSEEK_API_KEY",
+        "xiaomi_mimo": "XIAOMI_MIMO_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+    }
+    env_var = provider_env_map.get(req.provider,
+                                    f"{req.provider.upper()}_API_KEY")
+    env[env_var] = key
 
     script = """
 import sys

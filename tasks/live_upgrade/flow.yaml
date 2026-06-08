@@ -1,21 +1,84 @@
-# 直播升级外呼任务流程图
-# 主流程 + 步进引导分支(条件)+ 边界行为分支(触发型)。
 nodes:
-  - {id: opening,        label: 开场+确认负责人,        rubric: opening.identity_check}
-  - {id: step2,          label: 告知后台默认低延迟,      rubric: flow.step2_proactive}
-  - {id: step3,          label: 说清两个独立选项,        rubric: flow.step3_two_options}
-  - {id: step4_guide,    label: 4步顺序引导(渠道未显示), rubric: flow.step4_guidance_order, optional: true}
-  - {id: step4_pace,     label: 分轮发送(节奏),          rubric: flow.step4_pace,           optional: true}
-  - {id: faq_latency,    label: 答延迟与适用场景,         rubric: faq.latency_explanation,   optional: true}
-  - {id: driving,        label: 在开车 → 礼貌挂断,         rubric: behavior.driving_hangup,   optional: true}
-  - {id: busy,           label: 很忙 → 1分钟挽留,          rubric: behavior.busy_retain,      optional: true}
-  - {id: discount,       label: 要折扣 → 拒承诺,           rubric: safety.no_discount_promise, optional: true}
+- id: opening
+  label: 开场+身份确认
+  rubric: opening.identity
+  optional: false
+- id: step1
+  label: 身份检查处理
+  rubric: flow.identity_check
+  optional: false
+- id: step2
+  label: 确认是否知情
+  rubric: flow.awareness_check
+  optional: false
+- id: step3
+  label: 传达升级内容
+  rubric: flow.explain_upgrade
+  optional: false
+- id: step4
+  label: 确认前端可见
+  rubric: flow.frontend_check
+  optional: false
+- id: step5
+  label: 检查学员端费用
+  rubric: flow.fee_check
+  optional: false
+- id: step6
+  label: 企业微信添加
+  rubric: flow.wechat_add
+  optional: false
+- id: end
+  label: 结束通话
+  rubric: flow.end
+  optional: false
+- id: faq
+  label: FAQ解答
+  rubric: faq.knowledge
+  optional: true
+- id: busy_retain
+  label: 老板忙时挽留
+  rubric: behavior.busy_retain
+  optional: true
+- id: driving_hangup
+  label: 开车挂断
+  rubric: behavior.driving_hangup
+  optional: true
+- id: interrupt_transition
+  label: 打断过渡
+  rubric: behavior.interrupt_transition
+  optional: true
 edges:
-  - [opening, step2]
-  - [step2, step3]
-  - [step3, step4_guide]
-  - [step4_guide, step4_pace]
-  - [step3, faq_latency]
-  - [opening, driving]
-  - [opening, busy]
-  - [step3, discount]
+- - opening
+  - step1
+- - step1
+  - step2
+- - step2
+  - step3
+- - step3
+  - step4
+- - step4
+  - step5
+- - step5
+  - step6
+- - step6
+  - end
+- - step3
+  - faq
+- - faq
+  - step4
+- - end
+  - faq
+- - faq
+  - end
+- - opening
+  - busy_retain
+- - busy_retain
+  - step1
+- - opening
+  - driving_hangup
+- - driving_hangup
+  - end
+- - step1
+  - interrupt_transition
+- - interrupt_transition
+  - step2

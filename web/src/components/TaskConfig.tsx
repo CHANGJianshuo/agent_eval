@@ -15,14 +15,13 @@ import { Badge } from '@/components/ui/Badge'
 
 
 export function TaskConfig({ taskId }: { taskId: string }) {
-  const [tab, setTab] = useState<'prompt' | 'rubrics' | 'versions'>('prompt')
+  const [tab, setTab] = useState<'prompt' | 'rubrics'>('prompt')
   return (
     <div className="space-y-3">
       <div className="flex gap-1 border-b border-border">
         {([
           ['prompt', '📝 Prompt'],
           ['rubrics', '📐 Rubrics'],
-          ['versions', '📜 版本历史'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -39,7 +38,6 @@ export function TaskConfig({ taskId }: { taskId: string }) {
       <div className="pt-3">
         {tab === 'prompt' && <PromptEditor taskId={taskId} />}
         {tab === 'rubrics' && <RubricsTable taskId={taskId} />}
-        {tab === 'versions' && <VersionsTable taskId={taskId} />}
       </div>
     </div>
   )
@@ -102,19 +100,22 @@ function PromptEditor({ taskId }: { taskId: string }) {
 
       {Object.keys(data.variables || {}).length > 0 && (
         <Card className="p-4 mt-3">
-          <h3 className="text-sm font-semibold mb-2">业务变量</h3>
+          <h3 className="text-sm font-semibold mb-1">业务变量</h3>
+          <p className="text-xs text-muted-foreground mb-2">
+            Prompt 中用 {'${变量名}'} 引用的占位符。跑测试时替换为真实值，评分器用白名单校验 SUT 不编造数字。
+          </p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground">
                 <th className="text-left py-1 pr-3">变量</th>
-                <th className="text-left py-1">默认值</th>
+                <th className="text-left py-1 pr-3">值</th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(data.variables).map(([k, v]) => (
                 <tr key={k} className="border-t border-border/50">
-                  <td className="py-1.5 pr-3 font-mono">{k}</td>
-                  <td className="py-1.5 font-mono text-muted-foreground">
+                  <td className="py-1.5 pr-3 font-mono text-xs">{k}</td>
+                  <td className="py-1.5 pr-3 font-mono text-muted-foreground text-xs">
                     {String(v)}
                   </td>
                 </tr>
@@ -129,25 +130,44 @@ function PromptEditor({ taskId }: { taskId: string }) {
 
 
 function RubricsTable({ taskId }: { taskId: string }) {
+  const qc = useQueryClient()
   const { data } = useQuery({
     queryKey: ['task-rubrics', taskId],
     queryFn: () => TasksAPI.rubrics(taskId),
+  })
+  const [edits, setEdits] = useState<Record<number, number>>({})
+  const saveMut = useMutation({
+    mutationFn: (rubrics: any[]) => TasksAPI.updateRubrics(taskId, rubrics),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-rubrics', taskId] })
+      setEdits({})
+    },
   })
 
   if (!data) return <div className="text-sm text-muted-foreground">加载中…</div>
   if (data.rubrics.length === 0) {
     return (
       <Card className="p-6 text-sm text-muted-foreground">
-        还没有 rubrics(任务可能尚未完成生成步骤)
+        还没有 rubrics（任务可能尚未完成生成步骤）
       </Card>
     )
+  }
+
+  const dirty = Object.keys(edits).length > 0
+  const handleSave = () => {
+    const updated = data.rubrics.map((r: any, i: number) => ({
+      ...r,
+      weight: edits[i] ?? r.weight,
+    }))
+    saveMut.mutate(updated)
   }
 
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground">
         共 {data.rubrics.length} 条
-        {data.is_draft && <Badge variant="warning" className="ml-2">草稿待审</Badge>}
+        {data.is_draft && <Badge variant="warning" className="ml-2">草稿</Badge>}
+        {dirty && <span className="text-warning ml-2">· 有未保存的修改</span>}
       </div>
       <Card className="overflow-hidden p-0">
         <table className="w-full text-sm">
@@ -175,7 +195,20 @@ function RubricsTable({ taskId }: { taskId: string }) {
                 <td className="px-3 py-2 text-muted-foreground text-xs">
                   {r.method}
                 </td>
-                <td className="px-3 py-2 text-right text-xs">{r.weight}</td>
+                <td className="px-3 py-2 text-right">
+                  <input
+                    type="number"
+                    value={edits[i] ?? r.weight}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v)) setEdits({ ...edits, [i]: v })
+                    }}
+                    step={0.01} min={0} max={1}
+                    className="w-16 px-1.5 py-0.5 text-xs font-mono text-right
+                               border border-border rounded
+                               focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                  />
+                </td>
                 <td className="px-3 py-2 text-center text-warning">
                   {r.is_safety ? '★' : ''}
                 </td>
@@ -187,6 +220,19 @@ function RubricsTable({ taskId }: { taskId: string }) {
           </tbody>
         </table>
       </Card>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        {dirty && (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setEdits({})}>
+              撤销
+            </Button>
+            <Button variant="primary" size="sm" disabled={saveMut.isPending} onClick={handleSave}>
+              {saveMut.isPending && <Loader2 size={12} className="animate-spin" />}
+              保存权重
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,0 +1,21 @@
+id: ask_contract_type_faq
+name: 询问合同类型区别
+scenario: '你是飞毛腿骑手。站长提到单日合同和多日合同的要求不同，你不清楚自己签的是哪种，
+
+  于是询问区别。对方解释后你表示明白了，继续配合走完流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_contract_type
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_contract_type
+  inject_at_turn: 2
+  text: 站长，我这合同是单日的还是多日的？
+  description: 触发 faq_contract_type 节点
+max_rounds: 9

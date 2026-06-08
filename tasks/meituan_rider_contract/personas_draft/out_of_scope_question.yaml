@@ -1,0 +1,23 @@
+id: out_of_scope_question
+name: 开场问超出职责问题
+scenario: '你是接到电话的用户。站长刚一确认身份，你立刻问了一个完全无关的问题
+
+  （比如工资发放时间）。对方说明只能回答合同相关事宜后，你不再纠缠，
+
+  开始配合完成合同通知的全部流程。
+
+  '
+covers_flow_nodes:
+- opening
+- behavior_out_of_scope
+- step1
+- step2
+- step3
+- step4
+- end
+probes:
+- id: trigger_oos
+  inject_at_turn: 1
+  text: 对了站长，我这个月的工资什么时候发？
+  description: 触发 behavior_out_of_scope 节点
+max_rounds: 9

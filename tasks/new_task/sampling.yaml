@@ -1,0 +1,6 @@
+weights:
+  happy_path: 10.0
+  ask_contract_detail: 10.0
+  ask_exit_rule: 10.0
+  ask_out_of_scope: 10.0
+  refuse_to_deliver: 10.0

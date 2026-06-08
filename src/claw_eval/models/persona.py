@@ -62,21 +62,24 @@ class ProbeConfig(BaseModel):
 
 
 class PersonaScript(BaseModel):
-    """任务剧本 —— 任务专属的状态机 + 探针;引用一个性格 + 一份噪音规格。"""
+    """任务剧本 —— 任务专属,描述一条逻辑分支路径 + 探针。与性格完全解耦。
+
+    v2 格式:scenario(场景描述) + probes + covers_flow_nodes,无状态机。
+    v1 格式(向后兼容):states + transitions + personality,仍可加载。
+    """
 
     id: str
-    personality: str                                # 引用 personalities/<id>.yaml
-    noise: NoiseSpec = Field(default_factory=NoiseSpec)
     name: str = ""
-    states: dict[str, str]
-    initial_state: str
-    # transitions 值两种形式:
-    #   - str  → 确定性单一目标(老格式,向后兼容)
-    #   - dict[str, float] → 概率多分支 {next_state: weight}
-    transitions: dict[str, str | dict[str, float]]
+    scenario: str = ""                              # v2: 场景描述,告诉模拟器该走哪条逻辑分支
+    covers_flow_nodes: list[str] = Field(default_factory=list)
     probes: list[ProbeConfig] = Field(default_factory=list)
     max_rounds: int = 12
-    covers_flow_nodes: list[str] = Field(default_factory=list)   # 该剧本声明能触发哪些 flow 节点
+    noise: NoiseSpec = Field(default_factory=NoiseSpec)
+    # v1 兼容字段(新生成的剧本不再填)
+    personality: str = ""                           # v1: 绑定的性格 id
+    states: dict[str, str] = Field(default_factory=dict)
+    initial_state: str = ""
+    transitions: dict[str, str | dict[str, float]] = Field(default_factory=dict)
 
 
 class Persona(BaseModel):
@@ -92,13 +95,19 @@ class Persona(BaseModel):
     # —— 来自噪音层(rate 版)——
     noise_rate: float = 0.0
     noise_kinds: list[NoiseKind] = Field(default_factory=list)
-    # —— 来自剧本层 ——
-    states: dict[str, str]
-    initial_state: str
-    transitions: dict[str, str | dict[str, float]]
+    # —— 来自剧本层(v2: scenario; v1: states/transitions) ——
+    script_id: str = ""
+    scenario: str = ""
+    states: dict[str, str] = Field(default_factory=dict)
+    initial_state: str = ""
+    transitions: dict[str, str | dict[str, float]] = Field(default_factory=dict)
     probes: list[ProbeConfig] = Field(default_factory=list)
     max_rounds: int = 12
     covers_flow_nodes: list[str] = Field(default_factory=list)
+
+    @property
+    def is_v2(self) -> bool:
+        return bool(self.scenario)
 
 
 def load_personality(path: str | Path) -> Personality:
@@ -125,7 +134,19 @@ def load_persona(script_path: str | Path,
     pdir = Path(personalities_dir) if personalities_dir else root / "personalities"
     nfile = Path(noise_file) if noise_file else root / "configs" / "noise_profiles.yaml"
 
-    personality = load_personality(pdir / f"{script.personality}.yaml")
+    if script.personality:
+        personality = load_personality(pdir / f"{script.personality}.yaml")
+        p_id = personality.id
+        p_name = personality.name
+        p_desc = personality.description
+        p_style = personality.speaking_style
+        p_demo = personality.demographics
+    else:
+        p_id = "generic"
+        p_name = script.name or script.id
+        p_desc = "你是一位真实用户。"
+        p_style = "自然口语,简短礼貌。"
+        p_demo = Demographics()
 
     noise_kinds: list[NoiseKind] = []
     if script.noise.kinds and Path(nfile).exists():
@@ -136,17 +157,18 @@ def load_persona(script_path: str | Path,
 
     return Persona(
         id=script.id,
-        name=script.name or f"{personality.name}·{script.id}",
-        personality_id=personality.id,
-        description=personality.description,
-        speaking_style=personality.speaking_style,
-        demographics=personality.demographics,            # 性格层带的人口学,直接传入运行时
+        name=script.name or f"{p_name}·{script.id}",
+        personality_id=p_id,
+        description=p_desc,
+        speaking_style=p_style,
+        demographics=p_demo,
         noise_rate=script.noise.rate,
         noise_kinds=noise_kinds,
+        scenario=script.scenario,
         states=script.states,
         initial_state=script.initial_state,
         transitions=script.transitions,
         probes=script.probes,
         max_rounds=script.max_rounds,
-        covers_flow_nodes=script.covers_flow_nodes,        # 剧本声明覆盖的 flow 节点
+        covers_flow_nodes=script.covers_flow_nodes,
     )

@@ -1,0 +1,21 @@
+id: ask_exit_rule
+name: 询问退出规则
+scenario: '你是骑手王小明。在站长说明连续配送天数后，你提出想了解如果临时有事要怎么退出飞毛腿，
+
+  得到退出规则的解答后，你表示明白并继续配合完成鼓励提醒和排名规则说明。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_exit
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_exit
+  inject_at_turn: 3
+  text: 那我万一临时有事想退出飞毛腿的话，应该怎么操作呢？
+  description: 触发 faq_exit 节点，询问退出规则
+max_rounds: 10

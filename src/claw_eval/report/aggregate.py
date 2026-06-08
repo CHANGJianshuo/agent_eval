@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..graders.scoring import PASS_THRESHOLD
 from ..models.trace import GradingResult
 
 
@@ -40,6 +41,8 @@ def aggregate(results: list[GradingResult]) -> AggregateSummary:
     if s.total_runs == 0:
         return s
 
+    for r in results:
+        r.passed = r.task_score >= PASS_THRESHOLD
     s.pass_count = sum(1 for r in results if r.passed)
     s.pass_rate = _round(s.pass_count / s.total_runs)
     s.avg_completion = _round(sum(r.dimension_scores.completion for r in results) / s.total_runs)

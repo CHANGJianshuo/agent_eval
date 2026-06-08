@@ -160,15 +160,23 @@ def parse_extractor_output(text: str) -> list[Rubric]:
 
 def extract_rubrics(task: TaskDefinition, judge_model: str,
                     reasoning_effort: str = "medium",
-                    temperature: float = 0.0) -> list[Rubric]:
-    """调 LLM,返回解析后的 rubric 列表。"""
+                    temperature: float = 0.0,
+                    max_attempts: int = 3) -> list[Rubric]:
+    """调 LLM,返回解析后的 rubric 列表。失败自动重试。"""
     user_prompt = build_prompt(task)
-    response = llm_client.chat(
-        judge_model,
-        [{"role": "system", "content": _SYSTEM_PROMPT},
-         {"role": "user", "content": user_prompt}],
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
-        max_tokens=8000,
-    )
-    return parse_extractor_output(response)
+    last_err: Exception | None = None
+    for attempt in range(max_attempts):
+        response = llm_client.chat(
+            judge_model,
+            [{"role": "system", "content": _SYSTEM_PROMPT},
+             {"role": "user", "content": user_prompt}],
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+            max_tokens=8000,
+        )
+        try:
+            return parse_extractor_output(response)
+        except (ValueError, yaml.YAMLError) as exc:
+            last_err = exc
+    raise RuntimeError(
+        f"rubric 抽取失败（重试 {max_attempts} 次）: {last_err}")

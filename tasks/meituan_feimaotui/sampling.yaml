@@ -1,0 +1,7 @@
+weights:
+  happy_path: 10.0
+  ask_exit_faq: 10.0
+  ask_contract_type_faq: 10.0
+  ask_reward_faq: 10.0
+  out_of_scope_question: 10.0
+  refuse_to_deliver: 10.0

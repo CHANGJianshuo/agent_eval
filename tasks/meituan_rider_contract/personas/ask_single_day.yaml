@@ -1,0 +1,21 @@
+id: ask_single_day
+name: 询问单日合同要求
+scenario: '你是接到电话的用户。在听完对方说明连续配送天数要求后，你想起还有一个
+
+  单日合同的问题，于是问了一句。得到解答后继续配合走完剩余流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_single_day
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_single_day
+  inject_at_turn: 3
+  text: 那单日合同具体是什么要求？
+  description: 触发 faq_single_day 节点
+max_rounds: 8

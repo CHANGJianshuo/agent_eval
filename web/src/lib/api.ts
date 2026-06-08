@@ -2,6 +2,7 @@ import axios from 'axios'
 import {
   MOCK_TASKS, MOCK_TASK_DETAILS, MOCK_TESTS,
   MOCK_PERSONA_LIB, MOCK_RUBRICS, MOCK_RECOMMENDATIONS,
+  MOCK_SCRIPTS,
   isBackendAvailable,
 } from './mockData'
 
@@ -86,12 +87,45 @@ export interface JobStatus {
   job_id: string
   status: string
   message: string
+  step?: number
+  total_steps?: number
+  step_label?: string
+  task_id?: string
+  job_type?: string
+}
+
+export interface FlowNode {
+  id: string
+  label: string
+  rubric?: string
+  optional?: boolean
+}
+
+export interface ScriptInfo {
+  id: string
+  filename: string
+  name: string
+  scenario: string
+  is_adversarial: boolean
+  is_draft: boolean
+  probes: Array<{ id: string; inject_at_turn: number; text: string; description: string }>
+  max_rounds: number
+  covers_flow_nodes: string[]
+  n_probes: number
+  // v1 兼容
+  personality: string
+  states: Record<string, string>
+  transitions: Record<string, string | Record<string, number>>
+  initial_state: string
+  n_states: number
 }
 
 export interface PersonaDimensionValue {
   value: string
   label: string
   desc: string
+  description?: string       // attitude 维度:用户模拟器自我描述
+  speaking_style?: string    // attitude 维度:说话风格
   usage_count: number
 }
 
@@ -146,6 +180,12 @@ export const TasksAPI = {
     () => api.get<{ rubrics: any[]; is_draft: boolean }>(`/tasks/${id}/rubrics`).then(r => r.data),
     () => ({ rubrics: MOCK_RUBRICS, is_draft: false }),
   ),
+  updateRubrics: (id: string, rubrics: any[]) =>
+    api.put(`/tasks/${id}/rubrics`, { rubrics }).then(r => r.data),
+  flow: (id: string) => withFallback(
+    () => api.get<{ nodes: FlowNode[]; edges: string[][] }>(`/tasks/${id}/flow`).then(r => r.data),
+    () => ({ nodes: [], edges: [] }),
+  ),
   versions: (id: string) => withFallback(
     () => api.get<{ versions: any[] }>(`/tasks/${id}/versions`).then(r => r.data),
     () => ({ versions: [] }),
@@ -157,6 +197,23 @@ export const TasksAPI = {
   recommendations: (id: string) => withFallback(
     () => api.get<{ recommendations: any[]; generated_at: string }>(`/tasks/${id}/recommendations`).then(r => r.data),
     () => MOCK_RECOMMENDATIONS,
+  ),
+  scripts: (id: string) => withFallback(
+    () => api.get<{ scripts: ScriptInfo[] }>(`/tasks/${id}/scripts`).then(r => r.data),
+    () => ({ scripts: MOCK_SCRIPTS[id] || [] }),
+  ),
+  reviewStatus: (id: string) => withFallback(
+    () => api.get<{
+      rubrics_approved: boolean; rubrics_draft: boolean;
+      personas_approved: string[]; personas_pending: string[]
+    }>(`/tasks/${id}/review-status`).then(r => r.data),
+    () => ({ rubrics_approved: true, rubrics_draft: false, personas_approved: [], personas_pending: [] }),
+  ),
+  approve: (id: string, approveRubrics: boolean, approvePersonas: string[]) => withFallback(
+    () => api.post(`/tasks/${id}/approve`, {
+      approve_rubrics: approveRubrics, approve_personas: approvePersonas,
+    }).then(r => r.data),
+    () => ({ ok: false }),
   ),
 }
 
@@ -174,6 +231,15 @@ export const TestsAPI = {
       }
       return MOCK_TESTS.meituan_rider[0]
     },
+  ),
+  results: (testId: string) => withFallback(
+    () => api.get<{
+      results: any[]
+      scripts: string[]
+      attitudes: string[]
+      heatmap: Array<{ script: string; attitude: string; count: number; avg_score: number; passed: number }>
+    }>(`/tests/${testId}/results`).then(r => r.data),
+    () => ({ results: [], scripts: [], attitudes: [], heatmap: [] }),
   ),
   start: (taskId: string, req: NewTestRequest) => withFallback(
     () => api.post<JobStatus>(`/tasks/${taskId}/tests`, req).then(r => r.data),
@@ -210,16 +276,26 @@ export const PersonaLibAPI = {
     () => api.get<{ dimensions: PersonaDimension[] }>('/persona-library').then(r => r.data),
     () => MOCK_PERSONA_LIB,
   ),
+  save: (dimensions: PersonaDimension[]) => withFallback(
+    () => api.put('/persona-library', { dimensions }).then(r => r.data),
+    () => ({ ok: false, message: 'Demo 模式不可保存' }),
+  ),
 }
 
 export const ConfigAPI = {
   getModels: () => withFallback(
     () => api.get('/config/models').then(r => r.data),
     () => ({
-      sut: { model: 'mimo-v2.5', temperature: 0.7, reasoning_effort: 'low' },
-      simulator: { model: 'mimo-v2-pro', temperature: 0.7, reasoning_effort: 'low' },
-      judge: { model: 'mimo-v2.5-pro', temperature: 0.0, reasoning_effort: 'medium' },
-      concurrency: 4,
+      sut: { model: 'deepseek-v4-flash', temperature: 0.7, reasoning_effort: 'low' },
+      simulator: { model: 'deepseek-v4-flash', temperature: 0.7, reasoning_effort: 'low' },
+      judge: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'medium' },
+      extract_rubric: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'medium' },
+      extract_personas: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'medium' },
+      extract_flow: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'medium' },
+      extract_variables: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'low' },
+      recommend: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'medium' },
+      apply_patch: { model: 'deepseek-v4-pro', temperature: 0.0, reasoning_effort: 'medium' },
+      concurrency: 8,
     }),
   ),
   updateModels: (cfg: any) => withFallback(
@@ -228,7 +304,7 @@ export const ConfigAPI = {
   ),
   listKeys: () => withFallback(
     () => api.get<Record<string, string | null>>('/config/api-keys').then(r => r.data),
-    () => ({ xiaomi_mimo: null, openai: null, anthropic: null }),
+    () => ({ deepseek: null, xiaomi_mimo: null, openai: null, anthropic: null }),
   ),
   saveKey: (provider: string, api_key: string) => withFallback(
     () => api.post('/config/api-key', { provider, api_key }).then(r => r.data),
@@ -241,6 +317,7 @@ export const ConfigAPI = {
 }
 
 export const JobsAPI = {
+  list: () => api.get<JobStatus[]>('/jobs').then(r => r.data),
   get: (id: string) => api.get<JobStatus>(`/jobs/${id}`).then(r => r.data),
-  getTest: (id: string) => api.get<JobStatus>(`/jobs/test/${id}`).then(r => r.data),
+  getTestJob: (id: string) => api.get<JobStatus>(`/jobs/test/${id}`).then(r => r.data),
 }

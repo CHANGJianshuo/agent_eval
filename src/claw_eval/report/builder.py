@@ -291,20 +291,26 @@ def build_dashboard_from_dir(traces_dir: str | Path,
     """便捷入口:从 traces_dir 收集所有 result.json,生成多页 dashboard。
 
     顺带从 <repo>/tasks/<id>/task.yaml 取任务中文名。
+    支持两种布局:
+      - traces/          → 递归扫所有子目录(全局)
+      - traces/<run_id>/ → 扫当前目录(单次运行)
     """
     results = load_results_dir(traces_dir)
 
     task_names: dict[str, str] = {}
-    tasks_root = Path(traces_dir).resolve().parent / "tasks"
-    if tasks_root.is_dir():
-        for tdir in sorted(tasks_root.iterdir()):
-            ty = tdir / "task.yaml"
-            if ty.exists():
-                try:
-                    data = yaml.safe_load(ty.read_text(encoding="utf-8"))
-                    task_names[data.get("task_id", tdir.name)] = \
-                        data.get("task_name", tdir.name)
-                except Exception:  # noqa: BLE001
-                    pass
+    # 寻找 tasks/ 目录:先试同级,再试上两级(run 子目录场景)
+    td = Path(traces_dir).resolve()
+    for candidate in [td.parent / "tasks", td.parent.parent / "tasks"]:
+        if candidate.is_dir():
+            for tdir in sorted(candidate.iterdir()):
+                ty = tdir / "task.yaml"
+                if ty.exists():
+                    try:
+                        data = yaml.safe_load(ty.read_text(encoding="utf-8"))
+                        task_names[data.get("task_id", tdir.name)] = \
+                            data.get("task_name", tdir.name)
+                    except Exception:  # noqa: BLE001
+                        pass
+            break
 
     return build_dashboard(results, out_dir, task_names)

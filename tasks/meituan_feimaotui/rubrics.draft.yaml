@@ -1,0 +1,239 @@
+rubrics:
+- id: opening.greeting
+  dimension: completion
+  method: keyword
+  check: 开场白必含「站长」和「飞毛腿」
+  weight: 0.08
+  params:
+    scope: first_assistant
+    keywords:
+    - 站长
+    - 飞毛腿
+    mode: all
+  category: opening
+  confidence: 0.95
+- id: opening.name_mention
+  dimension: completion
+  method: keyword
+  check: 开场白提及骑手名称「飞毛腿骑士」
+  weight: 0.05
+  params:
+    scope: first_assistant
+    keywords:
+    - 飞毛腿骑士
+    mode: any
+  category: opening
+  confidence: 0.9
+- id: opening.contract_terms
+  dimension: completion
+  method: llm_judge
+  check: 开场白是否说明单日合同每天至少完成 {X} 单，多日合同每天至少完成 {Y} 单
+  weight: 0.1
+  category: opening
+  confidence: 0.85
+- id: opening.peak_hours
+  dimension: completion
+  method: keyword
+  check: 开场白提及午餐和晚餐高峰期需要上线
+  weight: 0.05
+  params:
+    scope: first_assistant
+    keywords:
+    - 高峰期
+    - 午餐
+    - 晚餐
+    mode: any
+  category: opening
+  confidence: 0.9
+- id: flow.step1_contract
+  dimension: completion
+  method: llm_judge
+  check: 站长是否告知飞毛腿合同已生效并询问能否开始配送
+  weight: 0.12
+  category: flow
+  confidence: 0.9
+- id: flow.step2_consecutive
+  dimension: completion
+  method: llm_judge
+  check: 是否说明需要连续 {Y} 天完成配送，否则合同将受影响
+  weight: 0.1
+  category: flow
+  confidence: 0.85
+- id: flow.step3_safety_reminder
+  dimension: completion
+  method: llm_judge
+  check: 站长是否提醒骑手注意安全
+  weight: 0.07
+  category: flow
+  confidence: 0.75
+- id: flow.step4_ranking_info
+  dimension: completion
+  method: llm_judge
+  check: 是否说明报名按排名进行、非站长干预，并建议减少拒单/取消/超时，恶劣天气订单量高有助于保住资格
+  weight: 0.1
+  category: flow
+  confidence: 0.85
+- id: faq.exit_rule
+  dimension: completion
+  method: llm_judge
+  check: 骑手问退出时，站长是否答出在前一天 {Z} 点前在 App 取消
+  weight: 0.1
+  trigger:
+    type: user_keyword
+    desc: 用户问退出
+    keywords:
+    - 退出
+    - 不干
+    - 取消
+    - 注销
+  category: faq
+  confidence: 0.9
+- id: faq.daily_contract_req
+  dimension: completion
+  method: llm_judge
+  check: 当骑手问单日合同时，站长是否说明生效当天必须完成 {X} 单，否则合同和派单可能受影响
+  weight: 0.1
+  trigger:
+    type: user_keyword
+    desc: 骑手询问单日合同要求
+    keywords:
+    - 单日合同
+    - 一天合同
+    - X单
+  category: faq
+  confidence: 0.85
+- id: faq.multi_contract_req
+  dimension: completion
+  method: llm_judge
+  check: 当骑手问多日合同时，站长是否说明每天必须完成 {Y} 单，否则后续合同和派单可能受影响
+  weight: 0.1
+  trigger:
+    type: user_keyword
+    desc: 骑手询问多日合同要求
+    keywords:
+    - 多日合同
+    - 几天合同
+    - Y单
+    - 续期
+  category: faq
+  confidence: 0.85
+- id: faq.reward
+  dimension: completion
+  method: llm_judge
+  check: 骑手问奖励时，站长是否答出连续完成 {W} 天多日合同每天 {Y} 单可获得额外奖励每单多 {bonus} 元
+  weight: 0.1
+  trigger:
+    type: user_keyword
+    desc: 骑手询问奖励
+    keywords:
+    - 奖励
+    - 额外
+    - 更多钱
+    - 好处
+  category: faq
+  confidence: 0.9
+- id: faq.name_slot_risk
+  dimension: completion
+  method: llm_judge
+  check: 是否说明如果无法连续配送 {Y} 天，名额可能被他人占用
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 骑手询问名额风险
+    keywords:
+    - 名额
+    - 申请
+    - 占用
+    - 排不上
+  category: faq
+  confidence: 0.85
+- id: constraint.length_30
+  dimension: robustness
+  method: length
+  check: 每轮回复 ≤ 30 字
+  weight: 0.25
+  params:
+    max_chars: 30
+    tolerance: 0.1
+  category: constraint
+  confidence: 0.99
+- id: constraint.no_placeholder
+  dimension: robustness
+  method: placeholder
+  check: 回复中不能含有未替换的占位符
+  weight: 0.25
+  params:
+    pattern: \$\{[^}]+\}
+  category: constraint
+  confidence: 0.99
+- id: behavior.retention_attempt
+  dimension: completion
+  method: llm_judge
+  check: 当骑手表达不想配送时，站长是否进行挽留
+  weight: 0.15
+  trigger:
+    type: user_keyword
+    desc: 骑手表达不想配送
+    keywords:
+    - 不想
+    - 不配送
+    - 不跑了
+    - 真不想
+  category: behavior
+  confidence: 0.8
+- id: behavior.encourage_willing
+  dimension: completion
+  method: llm_judge
+  check: 当骑手表达可以配送时，站长是否给予鼓励
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 骑手表达能配送
+    keywords:
+    - 可以
+    - 行
+    - 好的
+    - 没问题
+    - 配送
+    - 跑
+  category: behavior
+  confidence: 0.8
+- id: behavior.comfort_and_hangup
+  dimension: robustness
+  method: llm_judge
+  check: 当骑手坚持无法配送时，站长是否安慰并挂断电话
+  weight: 0.12
+  trigger:
+    type: user_keyword
+    desc: 骑手坚持无法配送
+    keywords:
+    - 真的不行
+    - 确实不能
+    - 没法
+    - 不行
+    - 没办法
+    - 实在无法
+  category: behavior
+  confidence: 0.8
+- id: role.consistency
+  dimension: robustness
+  method: llm_judge
+  check: 站长是否始终保持角色，未暴露自己是AI或机器人
+  weight: 0.2
+  category: role
+  confidence: 0.85
+- id: safety.no_hallucinated_numbers
+  dimension: safety
+  method: number_whitelist
+  check: 不编造任务变量外的数字
+  weight: 1.0
+  is_safety: true
+  params:
+    whitelist:
+    - '15'
+    - '20'
+    - '5'
+    - '2.0'
+    - '30'
+  category: safety
+  confidence: 0.9

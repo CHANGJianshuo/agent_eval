@@ -1,0 +1,27 @@
+id: step3_faq
+name: 在介绍升级内容时提问
+scenario: '你是负责人，知情。
+
+  对方介绍升级内容时，你问“标准直播和低延迟直播费用具体差多少？”。
+
+  对方解答后继续。
+
+  后续Web控制台已可见，费用未设置，企业微信可添加，结束通话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- faq
+- step4
+- step5
+- step6
+- end
+probes:
+- id: trigger_faq_step3
+  inject_at_turn: 3
+  text: 那标准直播和低延迟直播费用具体差多少？
+  description: 触发 faq 节点（从 step3）
+max_rounds: 8

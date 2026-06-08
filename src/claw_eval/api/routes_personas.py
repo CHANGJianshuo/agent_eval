@@ -4,8 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
+from ..dimensions import load_dimensions, save_dimensions
 from ..models.persona import load_personality
 
 
@@ -25,92 +27,148 @@ TASKS_DIR = ROOT / "tasks"
 router = APIRouter()
 
 
-# 5 维度的属性字典 + 描述
-DIMENSIONS = {
-    "attitude": {
-        "label": "性格",
-        "values": [
-            {"value": "cooperative", "label": "合作型", "desc": "配合、礼貌、简短"},
-            {"value": "refuse", "label": "抵触型", "desc": "不愿做、坚决"},
-            {"value": "hesitant", "label": "犹豫型", "desc": "反复追问"},
-            {"value": "argumentative", "label": "抬杠型", "desc": "质疑、爱反问"},
-            {"value": "confused", "label": "茫然型", "desc": "不清楚"},
-            {"value": "blunt", "label": "直接强势型", "desc": "追着问、直接"},
-            {"value": "hurried", "label": "匆忙型", "desc": "急、话少"},
-            {"value": "adversarial", "label": "对抗型", "desc": "注入/社工/施压"},
-        ],
-    },
-    "mbti": {
-        "label": "MBTI",
-        "values": [
-            {"value": a + b + c + d, "label": a + b + c + d, "desc": ""}
-            for a in "IE" for b in "NS" for c in "FT" for d in "JP"
-        ],
-    },
-    "gender": {
-        "label": "性别",
-        "values": [
-            {"value": "male", "label": "男", "desc": ""},
-            {"value": "female", "label": "女", "desc": ""},
-        ],
-    },
-    "age_range": {
-        "label": "年龄段",
-        "values": [
-            {"value": "<20", "label": "<20", "desc": ""},
-            {"value": "20-29", "label": "20-29", "desc": ""},
-            {"value": "30-39", "label": "30-39", "desc": ""},
-            {"value": "40-49", "label": "40-49", "desc": ""},
-            {"value": "50+", "label": "50+", "desc": ""},
-        ],
-    },
-    "education": {
-        "label": "教育",
-        "values": [
-            {"value": "primary", "label": "小学", "desc": ""},
-            {"value": "middle", "label": "初中", "desc": ""},
-            {"value": "high", "label": "高中", "desc": ""},
-            {"value": "college", "label": "本科", "desc": ""},
-            {"value": "postgrad", "label": "研究生及以上", "desc": ""},
-        ],
-    },
-}
-
-
-@router.get("/persona-library")
-def get_persona_library():
-    """5 维度的属性字典 + 每个属性值的使用统计。"""
-    # 统计使用次数
+def _usage_counts() -> dict[str, dict[str, int]]:
+    """统计每个维度属性值在 personalities/ 里的使用次数。"""
+    data = load_dimensions()
     usage: dict[str, dict[str, int]] = {
-        dim: {v["value"]: 0 for v in cfg["values"]}
-        for dim, cfg in DIMENSIONS.items()
+        d["key"]: {v["value"]: 0 for v in d.get("values", [])}
+        for d in data.get("dimensions", [])
     }
     if PERSONALITIES_DIR.exists():
         for pf in PERSONALITIES_DIR.glob("*.yaml"):
             try:
                 p = load_personality(pf)
-                for dim in DIMENSIONS:
-                    v = getattr(p.demographics, dim)
-                    if v in usage[dim]:
-                        usage[dim][v] += 1
+                for key in usage:
+                    v = getattr(p.demographics, key, None)
+                    if v in usage[key]:
+                        usage[key][v] += 1
             except Exception:
                 pass
+    return usage
 
-    # 拼接 dimension 数据 + 使用次数
+
+@router.get("/persona-library")
+def get_persona_library():
+    """维度库(从 configs/dimensions.yaml 读)+ 每个属性值的使用统计。"""
+    data = load_dimensions()
+    usage = _usage_counts()
     dims = []
-    for dim, cfg in DIMENSIONS.items():
+    for d in data.get("dimensions", []):
+        key = d["key"]
         values = []
-        for vv in cfg["values"]:
+        for vv in d.get("values", []):
             values.append({
-                **vv,
-                "usage_count": usage[dim].get(vv["value"], 0),
+                "value": vv.get("value", ""),
+                "label": vv.get("label", vv.get("value", "")),
+                "desc": vv.get("desc", ""),
+                # attitude 维度特有
+                "description": vv.get("description", ""),
+                "speaking_style": vv.get("speaking_style", ""),
+                "usage_count": usage.get(key, {}).get(vv.get("value"), 0),
             })
-        dims.append({
-            "dim": dim,
-            "label": cfg["label"],
-            "values": values,
-        })
+        dims.append({"dim": key, "label": d.get("label", key), "values": values})
     return {"dimensions": dims}
+
+
+class DimValue(BaseModel):
+    value: str
+    label: str = ""
+    desc: str = ""
+    description: str = ""        # attitude 维度:用户模拟器自我描述
+    speaking_style: str = ""     # attitude 维度:说话风格
+
+
+class DimensionIn(BaseModel):
+    dim: str                     # 维度 key
+    label: str
+    values: list[DimValue]
+
+
+class PersonaLibraryIn(BaseModel):
+    dimensions: list[DimensionIn]
+
+
+@router.put("/persona-library")
+def update_persona_library(body: PersonaLibraryIn):
+    """保存整个维度库(全局配置页编辑后调)。"""
+    # 校验:key 唯一、非空;value 维度内唯一
+    seen_keys = set()
+    out_dims = []
+    for d in body.dimensions:
+        if not d.dim.strip():
+            raise HTTPException(400, "维度 key 不能为空")
+        if d.dim in seen_keys:
+            raise HTTPException(400, f"维度 key 重复:{d.dim}")
+        seen_keys.add(d.dim)
+        seen_vals = set()
+        vals = []
+        for v in d.values:
+            if not v.value.strip():
+                raise HTTPException(400, f"维度 {d.dim} 有空属性值")
+            if v.value in seen_vals:
+                raise HTTPException(400, f"维度 {d.dim} 属性值重复:{v.value}")
+            seen_vals.add(v.value)
+            row = {"value": v.value, "label": v.label or v.value, "desc": v.desc}
+            # attitude 才存 description/speaking_style
+            if v.description or v.speaking_style:
+                row["description"] = v.description
+                row["speaking_style"] = v.speaking_style
+            vals.append(row)
+        out_dims.append({"key": d.dim, "label": d.label or d.dim, "values": vals})
+    save_dimensions({"dimensions": out_dims})
+    return {"ok": True, "n_dimensions": len(out_dims)}
+
+
+@router.get("/tasks/{task_id}/scripts")
+def get_task_scripts(task_id: str):
+    """该任务下所有剧本(状态机/探针),按场景展示。同时读 personas/ 和 personas_draft/。"""
+    td = TASKS_DIR / task_id
+    approved_stems: set[str] = set()
+    personas_dir = td / "personas"
+    if personas_dir.exists():
+        approved_stems = {p.stem for p in personas_dir.glob("*.yaml")}
+
+    all_files: list[tuple[Path, bool]] = []  # (path, is_draft)
+    seen: set[str] = set()
+    for subdir, draft in [("personas", False), ("personas_draft", True)]:
+        d = td / subdir
+        if d.exists():
+            for pf in sorted(d.glob("*.yaml")):
+                if pf.stem not in seen:
+                    seen.add(pf.stem)
+                    all_files.append((pf, draft and pf.stem not in approved_stems))
+    if not all_files:
+        return {"scripts": []}
+
+    out = []
+    for pf, is_draft in all_files:
+        try:
+            d = yaml.safe_load(pf.read_text(encoding="utf-8")) or {}
+            probes = d.get("probes", [])
+            scenario = d.get("scenario", "")
+            states = d.get("states", {})
+            out.append({
+                "id": d.get("id", pf.stem),
+                "filename": pf.name,
+                "name": d.get("name", pf.stem),
+                "scenario": scenario,
+                "is_adversarial": pf.stem.startswith("adv_"),
+                "is_draft": is_draft,
+                "probes": probes,
+                "max_rounds": d.get("max_rounds", 12),
+                "covers_flow_nodes": d.get("covers_flow_nodes", []),
+                "n_probes": len(probes),
+                # v1 兼容
+                "personality": d.get("personality", ""),
+                "states": states,
+                "transitions": d.get("transitions", {}),
+                "initial_state": d.get("initial_state", ""),
+                "n_states": len(states),
+            })
+        except Exception:
+            pass
+
+    return {"scripts": out}
 
 
 @router.get("/tasks/{task_id}/personas")

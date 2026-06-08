@@ -1,0 +1,27 @@
+id: interrupt_and_unknown
+name: 非负责人转达时打断，且不知情
+scenario: '你不是负责人，被要求转达时你打断说“刚才没听清，你再说一下重点”。
+
+  对方用过渡语衔接后继续。
+
+  当被问是否知情低延迟线路时，你表示不知道。
+
+  之后配合走完后续步骤：Web控制台已可见，费用未设置，企业微信可添加，结束。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- interrupt_transition
+- step2
+- step3
+- step4
+- step5
+- step6
+- end
+probes:
+- id: trigger_interrupt
+  inject_at_turn: 2
+  text: 不好意思，刚才没听清，你再说一下重点可以吗？
+  description: 触发 interrupt_transition 节点
+max_rounds: 10

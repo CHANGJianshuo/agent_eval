@@ -1,16 +1,64 @@
+# 模型配置 —— 每个步骤可独立指定模型、温度、reasoning_effort
+#
+# 两个模型档位:
+#   flash (deepseek-v4-flash): 快速便宜,适合高频对话
+#   pro   (deepseek-v4-pro):   强推理,适合评分/抽取
+#
+# 所有步骤共享同一个 provider(base_url + api_key)
+
 provider:
-  base_url: https://token-plan-sgp.xiaomimimo.com/v1
-  api_key_env: XIAOMI_MIMO_API_KEY
-sut:
-  model: mimo-v2.5
+  base_url: https://api.deepseek.com
+  api_key_env: DEEPSEEK_API_KEY
+
+# ========== 热路径(每轮调用,成本大头) ==========
+
+sut:                              # 被测模型 —— 这是评测对象
+  model: deepseek-v4-flash
   temperature: 0.7
   reasoning_effort: low
-simulator:
-  model: mimo-v2-pro
+
+simulator:                        # 用户模拟器 —— 扮演用户说话
+  model: deepseek-v4-flash
   temperature: 0.7
   reasoning_effort: low
-judge:
-  model: mimo-v2.5-pro
+
+# ========== 冷路径(每 case 评一次) ==========
+
+judge:                            # LLM 评委 —— 语义评分 + evidence
+  model: deepseek-v4-pro
   temperature: 0.0
   reasoning_effort: medium
+
+# ========== 一次性(任务设置时跑一次) ==========
+
+extract_rubric:                   # 从 Prompt 自动产评分项
+  model: deepseek-v4-pro
+  temperature: 0.0
+  reasoning_effort: low
+
+extract_personas:                 # 自动设计测试场景/剧本
+  model: deepseek-v4-pro
+  temperature: 0.0
+  reasoning_effort: low
+
+extract_flow:                     # 产流程图
+  model: deepseek-v4-pro
+  temperature: 0.0
+  reasoning_effort: low
+
+extract_variables:                # 提取业务变量(简单任务)
+  model: deepseek-v4-pro
+  temperature: 0.0
+  reasoning_effort: low
+
+recommend:                        # 弱项分析 + 改进建议
+  model: deepseek-v4-pro
+  temperature: 0.0
+  reasoning_effort: medium
+
+apply_patch:                      # 按建议修改 Prompt
+  model: deepseek-v4-pro
+  temperature: 0.0
+  reasoning_effort: medium
+
 concurrency: 8

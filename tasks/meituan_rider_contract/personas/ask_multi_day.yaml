@@ -1,0 +1,21 @@
+id: ask_multi_day
+name: 询问多日合同要求
+scenario: '你是接到电话的用户。对方提到连续配送多日合同时，你顺势追问多日合同每天
+
+  具体的完成单量要求。解答完后继续走完后续流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_multi_day
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_multi_day
+  inject_at_turn: 3
+  text: 多日合同每天必须完成多少单啊？
+  description: 触发 faq_multi_day 节点
+max_rounds: 8

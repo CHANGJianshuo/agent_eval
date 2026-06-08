@@ -1,21 +1,25 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Plus, ArrowRight } from 'lucide-react'
 
 import { TasksAPI, TestsAPI } from '@/lib/api'
+import { JobStore } from '@/lib/jobs'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { MilestoneProgress } from '@/components/ui/Progress'
 import { NewTestForm } from '@/components/NewTestForm'
 import { TaskConfig } from '@/components/TaskConfig'
+import { ScriptList } from '@/components/ScriptList'
+import { FlowGraph } from '@/components/FlowGraph'
+import { AgentChatToggle } from '@/components/AgentChat'
 
 
 export default function TaskOverview() {
   const { taskId = '' } = useParams<{ taskId: string }>()
+  const navigate = useNavigate()
   const [showNew, setShowNew] = useState(false)
-  const [pendingJob, setPendingJob] = useState<{ jobId: string; testId: string } | null>(null)
 
   const { data: task } = useQuery({
     queryKey: ['task', taskId],
@@ -26,23 +30,26 @@ export default function TaskOverview() {
     queryKey: ['tests', taskId],
     queryFn: () => TestsAPI.listByTask(taskId),
     enabled: !!taskId,
-    refetchInterval: pendingJob ? 5000 : false,    // 跑批时轮询
+    refetchInterval: false,
   })
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link to="/">
-          <Button variant="ghost" size="md">
-            <ArrowLeft size={14} /> 任务列表
-          </Button>
-        </Link>
-        <h1 className="text-xl font-semibold font-mono">{taskId}</h1>
-        {task?.description && (
-          <span className="text-sm text-muted-foreground truncate max-w-xl">
-            · {task.description}
-          </span>
-        )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/">
+            <Button variant="ghost" size="md">
+              <ArrowLeft size={14} /> 任务列表
+            </Button>
+          </Link>
+          <h1 className="text-xl font-semibold font-mono">{taskId}</h1>
+          {task?.description && (
+            <span className="text-sm text-muted-foreground truncate max-w-xl">
+              · {task.description}
+            </span>
+          )}
+        </div>
+        <AgentChatToggle taskId={taskId} />
       </div>
 
       {/* 任务级数字 */}
@@ -57,15 +64,19 @@ export default function TaskOverview() {
         </div>
       )}
 
-      {/* 新建测试表单 / 测试列表 */}
+      {/* 新建测试表单 / 测试历史 */}
       {showNew ? (
         <Card className="p-5">
           <NewTestForm
             taskId={taskId}
             onCancel={() => setShowNew(false)}
             onStarted={(jobId, testId) => {
-              setPendingJob({ jobId, testId })
-              setShowNew(false)
+              JobStore.add({
+                jobId, type: 'test', taskId,
+                description: `测试 ${testId}`,
+                startedAt: Date.now(),
+              })
+              navigate(`/tests/${testId}`)
             }}
           />
         </Card>
@@ -77,15 +88,6 @@ export default function TaskOverview() {
               <Plus size={14} /> 新建测试
             </Button>
           </div>
-
-          {pendingJob && (
-            <Card className="px-5 py-3 bg-warning/5 border-warning/30">
-              <div className="text-sm">
-                ⏳ 测试 <code className="font-mono text-xs">{pendingJob.testId}</code> 跑批中
-                <span className="text-muted-foreground"> · 自动刷新 · 完成后会显示在列表里</span>
-              </div>
-            </Card>
-          )}
 
           <Card>
             {tests.length === 0 ? (
@@ -108,15 +110,41 @@ export default function TaskOverview() {
         </>
       )}
 
-      {/* 任务级配置(可折叠) */}
-      <details className="border border-border rounded-lg" open>
-        <summary className="px-5 py-3 cursor-pointer text-sm font-medium hover:bg-accent">
-          ⚙️ 任务级配置(Prompt / Rubrics / 版本)
-        </summary>
-        <div className="px-5 py-4 border-t border-border">
-          <TaskConfig taskId={taskId} />
-        </div>
-      </details>
+      {!showNew && (
+        <>
+          {/* 流程图 */}
+          {task?.has_flow && (
+            <details className="border border-border rounded-lg" open>
+              <summary className="px-5 py-3 cursor-pointer text-sm font-medium hover:bg-accent">
+                🔀 对话流程图
+              </summary>
+              <div className="px-5 py-4 border-t border-border">
+                <FlowGraph taskId={taskId} />
+              </div>
+            </details>
+          )}
+
+          {/* 剧本列表 */}
+          <details className="border border-border rounded-lg" open>
+            <summary className="px-5 py-3 cursor-pointer text-sm font-medium hover:bg-accent">
+              📜 模拟用户剧本
+            </summary>
+            <div className="px-5 py-4 border-t border-border">
+              <ScriptList taskId={taskId} />
+            </div>
+          </details>
+
+          {/* 任务级配置 */}
+          <details className="border border-border rounded-lg">
+            <summary className="px-5 py-3 cursor-pointer text-sm font-medium hover:bg-accent">
+              ⚙️ 任务级配置(Prompt / Rubrics)
+            </summary>
+            <div className="px-5 py-4 border-t border-border">
+              <TaskConfig taskId={taskId} />
+            </div>
+          </details>
+        </>
+      )}
     </div>
   )
 }
@@ -139,8 +167,8 @@ function TestRow({ test }: { test: any }) {
   const pr = test.pass_rate
   const passColor =
     pr == null ? 'text-muted-foreground' :
-    pr >= 0.5 ? 'text-success' :
-    pr >= 0.2 ? 'text-warning' : 'text-destructive'
+    pr >= 0.6 ? 'text-success' :
+    pr >= 0.3 ? 'text-warning' : 'text-destructive'
 
   const statusBadge = {
     'running': <Badge variant="warning">⏳ 跑批中</Badge>,

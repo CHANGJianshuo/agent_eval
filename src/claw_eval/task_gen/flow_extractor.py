@@ -72,24 +72,34 @@ def parse_flow_output(text: str) -> FlowDiagram:
         text = m.group(1)
     data = yaml.safe_load(text)
     if not isinstance(data, dict):
-        raise ValueError(f"LLM 返回不是 dict(得到 {type(data).__name__})")
+        preview = text[:200] if text else "(空)"
+        raise ValueError(
+            f"LLM 返回不是 dict(得到 {type(data).__name__}): {preview}")
     return FlowDiagram.model_validate(data)
 
 
 def extract_flow(task_prompt: str, judge_model: str,
                  reasoning_effort: str = "medium",
-                 temperature: float = 0.0) -> FlowDiagram:
-    """调 LLM 抽 flow.yaml。"""
+                 temperature: float = 0.0,
+                 max_attempts: int = 3) -> FlowDiagram:
+    """调 LLM 抽 flow.yaml，失败自动重试。"""
     system, user = build_prompt(task_prompt)
-    response = llm_client.chat(
-        judge_model,
-        [{"role": "system", "content": system},
-         {"role": "user", "content": user}],
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
-        max_tokens=4000,
-    )
-    return parse_flow_output(response)
+    last_err: Exception | None = None
+    for attempt in range(max_attempts):
+        response = llm_client.chat(
+            judge_model,
+            [{"role": "system", "content": system},
+             {"role": "user", "content": user}],
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+            max_tokens=4000,
+        )
+        try:
+            return parse_flow_output(response)
+        except (ValueError, yaml.YAMLError) as exc:
+            last_err = exc
+    raise RuntimeError(
+        f"flow 抽取失败（重试 {max_attempts} 次）: {last_err}")
 
 
 def save_flow(flow: FlowDiagram, path) -> None:

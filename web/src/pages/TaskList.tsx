@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, ArrowRight, Loader2 } from 'lucide-react'
+import { Plus, Trash2, ArrowRight, Loader2, Check } from 'lucide-react'
 
-import { TasksAPI, type NewTaskRequest, type TaskListItem } from '@/lib/api'
+import { api, TasksAPI, JobsAPI, type NewTaskRequest, type TaskListItem } from '@/lib/api'
+import { JobStore, type TrackedJob } from '@/lib/jobs'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -13,10 +14,14 @@ import { MilestoneProgress } from '@/components/ui/Progress'
 export default function TaskList() {
   const [showNew, setShowNew] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const trackedJobs = useSyncExternalStore(JobStore.subscribe, JobStore.getSnapshot)
+  const genJobs = trackedJobs.filter(j => j.type === 'generate')
+  const testJobs = trackedJobs.filter(j => j.type === 'test')
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks'],
     queryFn: TasksAPI.list,
+    refetchInterval: (genJobs.length + testJobs.length) > 0 ? 5000 : false,
   })
   const qc = useQueryClient()
 
@@ -70,6 +75,14 @@ export default function TaskList() {
         ))}
       </div>
 
+      {/* 进行中的后台任务 */}
+      {genJobs.map(job => (
+        <RunningJobCard key={job.jobId} job={job} />
+      ))}
+      {testJobs.map(job => (
+        <RunningJobCard key={job.jobId} job={job} />
+      ))}
+
       {/* Toolbar */}
       {selected.size > 0 && (
         <div className="flex items-center justify-between px-3 py-1.5 rounded
@@ -91,7 +104,7 @@ export default function TaskList() {
         <Card className="p-8 flex items-center justify-center text-muted-foreground text-sm">
           <Loader2 className="animate-spin mr-2" size={14} /> 加载中…
         </Card>
-      ) : tasks.length === 0 ? (
+      ) : tasks.length === 0 && genJobs.length === 0 ? (
         <Card className="p-8 text-center">
           <div className="text-sm text-muted-foreground mb-3">
             还没有任务,点右上「新建任务」开始
@@ -117,6 +130,125 @@ export default function TaskList() {
 }
 
 
+// ==================== 进行中任务卡片 ====================
+
+const GEN_STEPS = [
+  { n: 1, label: '变量' },
+  { n: 2, label: '流程图' },
+  { n: 3, label: '评分项' },
+  { n: 4, label: '剧本' },
+  { n: 5, label: '评分器' },
+]
+
+function RunningJobCard({ job }: { job: TrackedJob }) {
+  const qc = useQueryClient()
+  const isTest = job.type === 'test'
+  const { data: jobData } = useQuery({
+    queryKey: ['job', job.jobId],
+    queryFn: () => isTest
+      ? JobsAPI.getTestJob(job.jobId).catch(() => null)
+      : JobsAPI.get(job.jobId),
+    refetchInterval: q => {
+      const status = q.state.data?.status
+      return status === 'running' ? 2000 : false
+    },
+  })
+
+  const isDone = jobData?.status === 'done'
+  const isFailed = jobData?.status === 'failed'
+  const curStep = jobData?.step ?? 0
+  const totalSteps = jobData?.total_steps ?? 5
+
+  useEffect(() => {
+    if (isDone || isFailed) {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      if (isDone) {
+        setTimeout(() => JobStore.remove(job.jobId), 3000)
+      }
+    }
+  }, [isDone, isFailed])
+
+  const steps = job.type === 'generate' ? GEN_STEPS : [{ n: 1, label: '测评中' }]
+
+  return (
+    <Card className={`px-4 py-3 space-y-2 ${
+      isFailed ? 'border-destructive/30 bg-destructive/3' :
+      isDone ? 'border-success/30 bg-success/3' :
+      'border-warning/30 bg-warning/3'
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm">
+          {!isDone && !isFailed && <Loader2 size={14} className="animate-spin" />}
+          {isDone && <Check size={14} className="text-success" />}
+          <span className="font-mono font-medium">{job.taskId}</span>
+          {job.description && (
+            <span className="text-muted-foreground">· {job.description}</span>
+          )}
+          <Badge variant={isDone ? 'success' : isFailed ? 'danger' : 'warning'}>
+            {isDone ? '已完成' : isFailed ? '失败' : job.type === 'generate' ? '生成中' : '测评中'}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          {isDone && (
+            <Link to={isTest ? `/tests/${job.jobId.replace('test_', '')}` : `/tasks/${job.taskId}`}>
+              <Button variant="outline" size="sm">
+                查看 <ArrowRight size={11} />
+              </Button>
+            </Link>
+          )}
+          {(isDone || isFailed) && (
+            <Button variant="ghost" size="sm" onClick={() => JobStore.remove(job.jobId)}>
+              关闭
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* 进度条 */}
+      {!isDone && !isFailed && (
+        <>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-foreground transition-all duration-500"
+              style={{ width: `${(curStep / totalSteps) * 100}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-1 text-[11px]">
+            {steps.map(s => {
+              const done = curStep >= s.n
+              const active = curStep === s.n
+              return (
+                <div key={s.n} className="flex items-center gap-1">
+                  {s.n > 1 && <span className="text-muted-foreground/40 mx-0.5">›</span>}
+                  {done ? (
+                    <Check size={10} className="text-success" />
+                  ) : active ? (
+                    <Loader2 size={10} className="animate-spin" />
+                  ) : (
+                    <span className="w-2.5 h-2.5 rounded-full border border-border inline-block" />
+                  )}
+                  <span className={active ? 'font-medium' : done ? 'text-muted-foreground' : 'text-muted-foreground/50'}>
+                    {s.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {isFailed && jobData?.message && (
+        <div className="text-xs text-destructive truncate">
+          {jobData.message.slice(-120)}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+
+// ==================== 任务行 ====================
+
 function TaskRow({ task, selected, onToggle }: {
   task: TaskListItem
   selected: boolean
@@ -124,8 +256,8 @@ function TaskRow({ task, selected, onToggle }: {
 }) {
   const passColor =
     task.last_pass_rate == null ? 'text-muted-foreground' :
-    task.last_pass_rate >= 0.5  ? 'text-success' :
-    task.last_pass_rate >= 0.2  ? 'text-warning' : 'text-destructive'
+    task.last_pass_rate >= 0.6  ? 'text-success' :
+    task.last_pass_rate >= 0.3  ? 'text-warning' : 'text-destructive'
 
   return (
     <Card className="hover:border-foreground/20 transition-colors group">
@@ -192,24 +324,48 @@ function TaskRow({ task, selected, onToggle }: {
 }
 
 
+// ==================== 新建任务表单 ====================
+
 function NewTaskForm({ onCancel }: { onCancel: () => void }) {
-  const [taskId, setTaskId] = useState('')
-  const [description, setDescription] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [generatedMeta, setGeneratedMeta] = useState<{ taskId: string; description: string } | null>(null)
+  const [error, setError] = useState('')
 
-  const qc = useQueryClient()
-  const createMut = useMutation({
-    mutationFn: (req: NewTaskRequest) => TasksAPI.create(req),
-    onSuccess: (r) => {
-      setJobId(r.job_id)
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-    },
-  })
 
-  const okId = /^[a-z][a-z0-9_]*$/.test(taskId)
   const okPrompt = prompt.trim().length > 50
-  const ready = okId && okPrompt
+  const qc = useQueryClient()
+
+  const handleGenerate = async () => {
+    setGenerating(true)
+    setError('')
+    try {
+      let taskId = 'new_task'
+      let description = ''
+      try {
+        const meta = await api.post('/extract-task-meta', { prompt })
+        taskId = meta.data.task_id || 'new_task'
+        description = meta.data.description || ''
+      } catch { /* fallback */ }
+      setGeneratedMeta({ taskId, description })
+
+      const r = await TasksAPI.create({ task_id: taskId, description, prompt })
+
+      // 注册后台任务,然后返回列表
+      JobStore.add({
+        jobId: r.job_id,
+        type: 'generate',
+        taskId,
+        description,
+        startedAt: Date.now(),
+      })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      onCancel()
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '创建失败')
+      setGenerating(false)
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -220,78 +376,56 @@ function NewTaskForm({ onCancel }: { onCancel: () => void }) {
         <h1 className="text-xl font-semibold tracking-tight">新建任务</h1>
       </div>
 
-      <Card className="p-6 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">任务 ID</label>
-            <input
-              value={taskId}
-              onChange={e => setTaskId(e.target.value)}
-              placeholder="如 live_upgrade_v2"
-              className="w-full px-3 py-1.5 text-sm border border-border rounded-md
-                          focus:outline-none focus:ring-2 focus:ring-foreground/20
-                          font-mono"
-            />
-            {taskId && !okId && (
-              <p className="text-xs text-destructive">必须英文小写下划线开头</p>
-            )}
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">简介(可选)</label>
-            <input
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="如 课程平台直播升级通知"
-              className="w-full px-3 py-1.5 text-sm border border-border rounded-md
-                          focus:outline-none focus:ring-2 focus:ring-foreground/20"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium">任务 Prompt(完整 SUT system prompt)</label>
+      <Card className="p-6 space-y-5">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">SUT System Prompt</label>
+          <p className="text-xs text-muted-foreground">
+            粘贴被测模型的完整指令。点击一键生成后，系统自动生成任务 ID、简介、评分项、剧本等。
+          </p>
           <textarea
+            autoFocus
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
+            disabled={generating}
             rows={14}
-            placeholder={`# Role: ...\n# Task: ...\n# Constraints:\n- ...\n# Conversation Flow:\n## Step 1: ...`}
+            placeholder={[
+              '粘贴 SUT 的 System Prompt，如：',
+              '',
+              '你是XX平台的客服，负责致电用户通知功能升级。',
+              '',
+              '## 对话流程',
+              '1. 问候确认身份',
+              '2. 说明升级内容',
+              '...',
+              '',
+              '## 约束',
+              '- 每句话不超过 20 字',
+              '- 不承诺优惠 / 不编造价格',
+            ].join('\n')}
             className="w-full px-3 py-2 text-sm border border-border rounded-md
-                        font-mono focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                        font-mono leading-relaxed
+                        focus:outline-none focus:ring-2 focus:ring-foreground/20
+                        disabled:opacity-60 disabled:cursor-not-allowed"
           />
           {prompt && !okPrompt && (
-            <p className="text-xs text-destructive">Prompt 太短(&lt;50 字)</p>
+            <p className="text-xs text-destructive">内容太短（至少 50 字）</p>
           )}
         </div>
 
-        {createMut.isPending || jobId ? (
-          <div className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
-            {jobId ? (
-              <>
-                ⏳ 后台跑 generate-task(~3-5 分钟)。
-                <code className="text-xs ml-1">{jobId}</code>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  几分钟后回到任务列表会看到新任务。
-                </div>
-              </>
-            ) : (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" />
-                提交中…
-              </span>
-            )}
-          </div>
-        ) : null}
+        {error && (
+          <p className="text-sm text-destructive">{error}</p>
+        )}
 
-        <div className="flex items-center gap-2 pt-2">
+        <div className="flex items-center justify-end pt-2 border-t border-border gap-2">
           <Button variant="ghost" onClick={onCancel}>取消</Button>
           <Button
             variant="primary"
-            disabled={!ready || createMut.isPending}
-            onClick={() => createMut.mutate({
-              task_id: taskId, description, prompt,
-            })}
+            disabled={!okPrompt || generating}
+            onClick={handleGenerate}
           >
-            <Plus size={14} /> 一键生成
+            {generating
+              ? <><Loader2 size={14} className="animate-spin" /> 生成中…</>
+              : <><Plus size={14} /> 一键生成</>}
           </Button>
         </div>
       </Card>

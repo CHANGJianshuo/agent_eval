@@ -1,0 +1,15 @@
+id: refuse_midway
+name: 中途坚持拒绝配送
+scenario: '你是接到电话的用户。确认身份并听完前两步说明后，在对方挽留时明确表示
+
+  今天确实有事无法配送，坚持不改口。被安慰后挂断电话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- give_up_end
+- end
+max_rounds: 7

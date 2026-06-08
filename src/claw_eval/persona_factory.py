@@ -145,10 +145,17 @@ def find_all_scripts(task_dir: Path) -> list[Persona]:
 
 def build_persona(demo: Demographics,
                   script: Persona,
-                  idx: int) -> Persona:
-    """从 demographics + 剧本基础 → 一个完整运行时 Persona。"""
+                  idx: int,
+                  templates: dict | None = None) -> Persona:
+    """从 demographics + 剧本基础 → 一个完整运行时 Persona。
+
+    templates: attitude → (description, speaking_style) 映射,来自维度库
+               (configs/dimensions.yaml)。None 时用内置兜底。
+    """
+    templates = templates or _ATTITUDE_TEMPLATES
     att = demo.attitude
-    desc, style = _ATTITUDE_TEMPLATES.get(att, _ATTITUDE_TEMPLATES["unspecified"])
+    fallback = templates.get("unspecified", ("你是一位真实用户。", "自然口语,简短礼貌。"))
+    desc, style = templates.get(att, fallback)
     pid = f"gen_t{idx + 1}_{att}_{demo.mbti}_{demo.gender}_{demo.age_range}"
     pid = pid.replace("<", "lt").replace(">", "gt").replace("+", "plus")
     return Persona(
@@ -158,8 +165,10 @@ def build_persona(demo: Demographics,
         description=desc,
         speaking_style=style,
         demographics=demo,
+        script_id=script.id,
         noise_rate=script.noise_rate,
         noise_kinds=script.noise_kinds,
+        scenario=script.scenario,
         states=dict(script.states),
         initial_state=script.initial_state,
         transitions=dict(script.transitions),
@@ -184,13 +193,20 @@ def generate_personas(dimensions: dict[str, dict[str, float]],
     if not scripts:
         raise ValueError(f"任务 {task_dir} 下没有可用剧本(personas/ 全空?)")
 
+    # 性格的描述/说话风格模板从维度库读(用户在全局配置加的新性格也生效)
+    try:
+        from .dimensions import attitude_templates
+        templates = attitude_templates()
+    except Exception:
+        templates = _ATTITUDE_TEMPLATES
+
     rng = random.Random(seed)
     out = []
     for i in range(n):
         demo = sample_demographics(dimensions, rng)
         # 轮询分配剧本:第 i 个 persona 用第 (i % 剧本数) 个剧本
         script = scripts[i % len(scripts)]
-        out.append(build_persona(demo, script, i))
+        out.append(build_persona(demo, script, i, templates))
     return out
 
 

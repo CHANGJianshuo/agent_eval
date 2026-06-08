@@ -4,12 +4,12 @@
  * 用户每个维度选要哪些属性、配比例(权重);
  * 系统按维度独立采样生成 N 个 persona 实例。
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Rocket, Eye, RotateCcw } from 'lucide-react'
+import { Loader2, Rocket, Eye, RotateCcw, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
-import { TestsAPI, PersonaLibAPI, type NewTestRequest, type PreviewResult } from '@/lib/api'
+import { TasksAPI, TestsAPI, PersonaLibAPI, type NewTestRequest, type PreviewResult } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 
@@ -31,7 +31,7 @@ interface Props {
 export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
   const [testId, setTestId] = useState(
     `test_${new Date().toISOString().slice(5, 16).replace(/[-:T]/g, '_')}`)
-  const [total, setTotal] = useState(30)
+  const [total, setTotal] = useState<number | null>(null)
   const [noJudge, setNoJudge] = useState(false)
   const [autoRec, setAutoRec] = useState(false)
 
@@ -69,20 +69,45 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
     queryFn: PersonaLibAPI.get,
   })
 
+  const { data: scriptsData } = useQuery({
+    queryKey: ['scripts', taskId],
+    queryFn: () => TasksAPI.scripts(taskId),
+  })
+  const nScripts = scriptsData?.scripts?.length ?? 0
+
+  // 推荐模拟用户数 = 特点组合数 × 剧本数
+  const nTraitCombos = useMemo(() => {
+    const counts = Object.values(activeDims).map(w => Object.keys(w).length)
+    if (counts.length === 0) return 1
+    return counts.reduce((a, b) => a * b, 1)
+  }, [activeDims])
+  const recommendedTotal = Math.max(nTraitCombos * Math.max(nScripts, 1), 10)
+
+  // 默认 total = 推荐数
+  const effectiveTotal = total ?? recommendedTotal
+  useEffect(() => {
+    if (total === null) setTotal(recommendedTotal)
+  }, [recommendedTotal])
+
   // 预览
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const previewMut = useMutation({
-    mutationFn: () => TestsAPI.previewPersonas(taskId, activeDims, total),
+    mutationFn: () => TestsAPI.previewPersonas(taskId, activeDims, effectiveTotal),
     onSuccess: (r) => setPreview(r),
   })
 
   // 启动测试
+  const [startError, setStartError] = useState('')
   const qc = useQueryClient()
   const startMut = useMutation({
     mutationFn: (req: NewTestRequest) => TestsAPI.start(taskId, req),
     onSuccess: (r) => {
+      setStartError('')
       qc.invalidateQueries({ queryKey: ['tests', taskId] })
       onStarted(r.job_id, testId)
+    },
+    onError: (e: any) => {
+      setStartError(e?.response?.data?.detail || '启动失败')
     },
   })
 
@@ -95,9 +120,17 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
           ← 取消
         </Button>
         <h2 className="text-lg font-semibold">新建测试</h2>
-        <span className="text-sm text-muted-foreground">
-          · 按维度比例独立采样生成模拟用户
-        </span>
+      </div>
+
+      {/* 说明 */}
+      <div className="text-xs text-muted-foreground bg-accent/30 rounded px-4 py-3 space-y-1">
+        <div>每个模拟用户 = <strong>特点</strong>（性格/年龄等） × <strong>剧本</strong>（对话场景路径）。</div>
+        <div>系统为每个用户随机组合一种特点和一个剧本，然后与被测模型对话并评分。</div>
+        <div>
+          当前有 <strong>{nScripts}</strong> 个剧本、
+          <strong>{nTraitCombos}</strong> 种特点组合 →
+          推荐至少 <strong>{recommendedTotal}</strong> 个模拟用户以覆盖所有组合。
+        </div>
       </div>
 
       {/* 基本参数 */}
@@ -110,15 +143,26 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
                         text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/20"
           />
         </FormField>
-        <FormField label="模拟用户数 --total">
-          <input
-            type="number"
-            value={total}
-            onChange={e => setTotal(parseInt(e.target.value) || 30)}
-            min={5} max={500} step={5}
-            className="w-full px-2.5 py-1.5 border border-border rounded-md
-                        text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-          />
+        <FormField label="模拟用户数（= 总运行数）">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              value={effectiveTotal}
+              onChange={e => setTotal(parseInt(e.target.value) || recommendedTotal)}
+              min={5} max={500} step={1}
+              className="w-full px-2.5 py-1.5 border border-border rounded-md
+                          text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+            {effectiveTotal < recommendedTotal && (
+              <button
+                onClick={() => setTotal(recommendedTotal)}
+                className="shrink-0 text-[10px] text-foreground underline hover:no-underline"
+                title={`推荐 ${recommendedTotal}（覆盖所有特点×剧本组合）`}
+              >
+                推荐 {recommendedTotal}
+              </button>
+            )}
+          </div>
         </FormField>
         <FormField label=" ">
           <label className="flex items-center gap-2 text-sm h-9">
@@ -145,9 +189,9 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
       {/* 5 维度区 */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">维度配置</h3>
+          <h3 className="text-sm font-semibold">模拟用户特点</h3>
           <div className="text-xs text-muted-foreground">
-            勾选要测的维度 · 各维度独立采样交叉组合 · 未启用的维度不参与
+            勾选要测的维度，调整各属性比例 · 未启用的维度不影响采样
           </div>
         </div>
 
@@ -173,7 +217,7 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
           disabled={!hasAnyDim || previewMut.isPending}
         >
           {previewMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-          预览生成 {total} 个 persona 的实际分布
+          预览生成 {effectiveTotal} 个模拟用户的分布
         </Button>
         {preview && (
           <Button variant="ghost" size="sm" onClick={() => setPreview(null)}>
@@ -183,15 +227,21 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
       </div>
 
       {preview && (
-        <PreviewSection preview={preview} total={total} />
+        <PreviewSection preview={preview} total={effectiveTotal} />
+      )}
+
+      {startError && (
+        <div className="border border-destructive/30 bg-destructive/5 rounded-lg px-4 py-3 text-sm text-destructive whitespace-pre-wrap">
+          {startError}
+        </div>
       )}
 
       {/* 启动按钮 */}
       <div className="flex items-center justify-between border-t border-border pt-4">
         <div className="text-xs text-muted-foreground">
           {hasAnyDim ?
-            `按维度采样 ${total} 个 persona,预计 ~${Math.ceil(total / 4)} 分钟${autoRec ? ' + 建议 ~3min' : ''}` :
-            '⚠ 至少给一个维度配比例'}
+            `${effectiveTotal} 个模拟用户 = ${effectiveTotal} 次运行（${nTraitCombos} 种特点 × ${nScripts} 个剧本轮询）· 预计 ~${Math.ceil(effectiveTotal / 4)} 分钟${autoRec ? ' + 建议 ~3min' : ''}` :
+            '⚠ 至少给一个特点维度配比例'}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={onCancel}>取消</Button>
@@ -200,7 +250,7 @@ export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
             disabled={!hasAnyDim || startMut.isPending}
             onClick={() => startMut.mutate({
               test_id: testId,
-              total, no_judge: noJudge,
+              total: effectiveTotal, no_judge: noJudge,
               dimensions: activeDims,
               auto_recommend: autoRec,
             })}
@@ -239,6 +289,7 @@ interface DimBlockProps {
 }
 
 function DimensionBlock({ label, options, current, enabled, onToggleEnabled, onChange }: DimBlockProps) {
+  const [collapsed, setCollapsed] = useState(false)
   const total = Object.values(current).reduce((s, v) => s + v, 0)
   const pieData = Object.entries(current)
     .filter(([_, v]) => v > 0)
@@ -264,41 +315,54 @@ function DimensionBlock({ label, options, current, enabled, onToggleEnabled, onC
     }
   }
 
+  const showContent = enabled && !collapsed
+
   return (
-    <div className={`border rounded-lg p-4 transition-colors
+    <div className={`border rounded-lg transition-colors
                       ${enabled ? 'border-border' : 'border-border/50 bg-muted/20'}`}>
-      <div className="flex items-center justify-between mb-3">
-        <button
-          onClick={onToggleEnabled}
-          className="flex items-center gap-2 group"
-        >
-          {/* toggle switch */}
-          <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full
-                            transition-colors ${enabled ? 'bg-foreground' : 'bg-border'}`}>
-            <span className={`inline-block h-3 w-3 transform rounded-full bg-background
-                              transition-transform ${enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-          </span>
-          <h4 className={`text-sm font-semibold ${enabled ? '' : 'text-muted-foreground'}`}>
-            {label}
-          </h4>
+      <div className={`flex items-center justify-between px-4 py-2.5
+                        ${showContent ? '' : ''}`}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleEnabled}
+            className="flex items-center gap-0"
+          >
+            <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full
+                              transition-colors ${enabled ? 'bg-foreground' : 'bg-border'}`}>
+              <span className={`inline-block h-3 w-3 transform rounded-full bg-background
+                                transition-transform ${enabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+            </span>
+          </button>
+          <button
+            onClick={() => enabled && setCollapsed(!collapsed)}
+            className="flex items-center gap-1.5"
+            disabled={!enabled}
+          >
+            {enabled && (
+              <ChevronDown size={14} className={`text-muted-foreground transition-transform
+                                                  ${collapsed ? '-rotate-90' : ''}`} />
+            )}
+            <h4 className={`text-sm font-semibold ${enabled ? '' : 'text-muted-foreground'}`}>
+              {label}
+            </h4>
+          </button>
           {enabled ? (
             <span className="text-xs text-muted-foreground">
               {Object.keys(current).length} / {options.length} 选 · 总 {total}
             </span>
           ) : (
-            <span className="text-xs text-muted-foreground">未启用(不参与采样)</span>
+            <span className="text-xs text-muted-foreground">未启用</span>
           )}
-        </button>
-        {enabled && Object.keys(current).length > 0 && (
+        </div>
+        {enabled && Object.keys(current).length > 0 && !collapsed && (
           <Button variant="ghost" size="sm" onClick={() => onChange({})}>
             清空
           </Button>
         )}
       </div>
 
-      {!enabled ? null : (
-      <div className="grid grid-cols-[1fr_180px] gap-4">
-        {/* 属性勾选 + 比例 */}
+      {showContent && (
+      <div className="grid grid-cols-[1fr_180px] gap-4 px-4 pb-4">
         <div className="grid grid-cols-2 gap-1.5">
           {options.map(opt => {
             const w = current[opt.value] || 0
@@ -338,7 +402,6 @@ function DimensionBlock({ label, options, current, enabled, onToggleEnabled, onC
           })}
         </div>
 
-        {/* mini 饼图 */}
         <div className="flex flex-col">
           {pieData.length > 0 ? (
             <>

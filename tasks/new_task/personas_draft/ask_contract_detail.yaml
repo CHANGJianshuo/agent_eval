@@ -1,0 +1,21 @@
+id: ask_contract_detail
+name: 询问合同细节
+scenario: '你是骑手王小明。站长告知合同生效并询问能否配送，你在回应时先确认单日与多日合同的具体单量要求，
+
+  对方解答后你表示没问题并继续听后续说明，配合走完剩余流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- faq_contract
+- step2
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_contract
+  inject_at_turn: 2
+  text: 对了，我想确认一下，单日合同是必须完成15单，多日合同是每天25单对吗？
+  description: 触发 faq_contract 节点，询问合同细节
+max_rounds: 10

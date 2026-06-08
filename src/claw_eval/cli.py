@@ -56,12 +56,23 @@ def _configure_provider(cfg: dict) -> None:
     llm_client.configure(api_base=base_url, api_key=api_key)
 
 
+def _step_cfg(cfg: dict, step: str, fallback: str = "judge") -> dict:
+    """读某步骤的模型配置;该步骤未配则 fallback 到指定角色。
+
+    返回 {"model": ..., "temperature": ..., "reasoning_effort": ...}
+    """
+    fb = cfg.get(fallback, {})
+    s = cfg.get(step, {})
+    return {
+        "model": s.get("model") or fb.get("model", ""),
+        "temperature": s.get("temperature", fb.get("temperature", 0.0)),
+        "reasoning_effort": s.get("reasoning_effort", fb.get("reasoning_effort")),
+    }
+
+
 def _make_judge(cfg: dict) -> LLMJudge:
-    return LLMJudge(
-        cfg["judge"]["model"],
-        cfg["judge"].get("temperature", 0.0),
-        cfg["judge"].get("reasoning_effort"),
-    )
+    c = _step_cfg(cfg, "judge")
+    return LLMJudge(c["model"], c["temperature"], c["reasoning_effort"])
 
 
 def _grade_trace(trace_path, task: TaskDefinition, rubrics, judge):
@@ -129,7 +140,7 @@ def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
     )
     result = _grade_trace(trace_path, task_def, rubrics, judge)
     result.persona_id = persona_obj.id
-    # 记录该 case 实际的 demographics(若有)
+    result.script_id = getattr(persona_obj, 'script_id', '') or persona_obj.id
     try:
         result.demographics = persona_obj.demographics.model_dump()
     except Exception:
@@ -352,7 +363,7 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
     n_pass = 0
     for name, scs in by_persona.items():
         all_scores.extend(scs)
-        n_pass += sum(1 for s in scs if s >= 0.75)
+        n_pass += sum(1 for s in scs if s >= scoring.PASS_THRESHOLD)
         if len(scs) > 1:
             ph = scoring.compute_pass_hat_k(scs, k=len(scs))
             typer.echo(f"  {name:>20}: scores={[round(s,3) for s in scs]}  "
@@ -521,9 +532,7 @@ def generate_task_cmd(
         auto_detect_placeholders, extract_variables,
     )
     from .rubric.extractor import extract_rubrics
-    from .user_simulator.extractor import (
-        extract_personas_with_coverage, save_persona_script,
-    )
+    from .user_simulator.extractor import extract_scripts, save_script
 
     prompt_path = Path(prompt)
     if not prompt_path.exists():
@@ -543,17 +552,20 @@ def generate_task_cmd(
 
     cfg = _load_models_cfg(config)
     _configure_provider(cfg)
-    judge_model = cfg["judge"]["model"]
-    effort_low = "low"
-    effort_med = cfg["judge"].get("reasoning_effort", "medium")
+
+    c_var = _step_cfg(cfg, "extract_variables")
+    c_flow = _step_cfg(cfg, "extract_flow")
+    c_rub = _step_cfg(cfg, "extract_rubric")
+    c_per = _step_cfg(cfg, "extract_personas")
 
     typer.echo(f"\n═══ 生成任务 {task_id} ═══\n")
 
     # ① 业务变量
-    typer.echo("① 抽业务变量(LLM low effort)…")
+    typer.echo(f"① 抽业务变量({c_var['model']})…")
     auto_vars = {k: f"<TODO {k}>" for k in auto_detect_placeholders(task_prompt)}
     try:
-        llm_vars = extract_variables(task_prompt, judge_model, effort_low)
+        llm_vars = extract_variables(task_prompt, c_var["model"],
+                                     c_var["reasoning_effort"])
     except Exception as exc:
         typer.echo(f"   ⚠ LLM 变量抽取失败:{exc};仅保留 placeholder")
         llm_vars = {}
@@ -561,8 +573,9 @@ def generate_task_cmd(
     typer.echo(f"   ✓ {len(variables)} 个变量:{list(variables.keys())}")
 
     # ② flow.yaml
-    typer.echo("\n② 抽 flow.yaml(LLM 中等 effort)…")
-    flow = extract_flow(task_prompt, judge_model, reasoning_effort=effort_med)
+    typer.echo(f"\n② 抽 flow.yaml({c_flow['model']})…")
+    flow = extract_flow(task_prompt, c_flow["model"],
+                        reasoning_effort=c_flow["reasoning_effort"])
     save_flow(flow, task_dir / "flow.yaml")
     typer.echo(f"   ✓ {len(flow.nodes)} 个节点 + {len(flow.edges)} 条边")
 
@@ -579,35 +592,35 @@ def generate_task_cmd(
     typer.echo(f"   写出 task.yaml({len(task_prompt)} 字符)")
 
     # ③ rubrics(草稿)
-    typer.echo("\n③ 抽 rubrics 草稿(LLM 中等 effort)…")
+    typer.echo(f"\n③ 抽 rubrics 草稿({c_rub['model']})…")
     from .models.task import TaskDefinition
     task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
-    rubrics = extract_rubrics(task_def, judge_model, reasoning_effort=effort_med)
+    rubrics = extract_rubrics(task_def, c_rub["model"],
+                              reasoning_effort=c_rub["reasoning_effort"])
     save_rubrics(rubrics, task_dir / "rubrics.draft.yaml", include_meta=True)
     typer.echo(f"   ✓ {len(rubrics)} 条 rubric 草稿 → rubrics.draft.yaml")
 
-    # ④ personas + 比例(必须覆盖 flow 节点)
-    typer.echo("\n④ 抽 personas + 比例 + 覆盖率…")
-    flow_node_list = [(n.id, n.label) for n in flow.nodes]
-    pset = extract_personas_with_coverage(
-        task_def, judge_model, _ROOT / "personalities",
-        flow_node_list, reasoning_effort=effort_med)
-    for s in pset.scripts:
-        save_persona_script(s, personas_draft_dir / f"{s.id}.yaml")
-    typer.echo(f"   ✓ {len(pset.scripts)} 个 persona 草稿 → personas_draft/")
+    # ④ 剧本(必须覆盖 flow 节点)
+    typer.echo(f"\n④ 抽剧本 + 覆盖率({c_per['model']})…")
+    sset = extract_scripts(
+        task_def.prompt, flow, c_per["model"],
+        variables=task_def.variables,
+        reasoning_effort=c_per["reasoning_effort"])
+    for s in sset.scripts:
+        save_script(s, personas_draft_dir / f"{s.id}.yaml")
+    typer.echo(f"   ✓ {len(sset.scripts)} 个剧本草稿 → personas_draft/")
 
     # sampling.yaml(草稿)
-    sampling = SamplingConfig(weights={k: v for k, v in pset.weights.items()},
-                                noise_overlay=NoiseOverlay())
+    weights = {s.id: 10 for s in sset.scripts}
+    sampling = SamplingConfig(weights=weights, noise_overlay=NoiseOverlay())
     save_sampling(sampling, task_dir / "sampling.yaml")
-    typer.echo(f"   写出 sampling.yaml(权重 {list(pset.weights.values())})")
+    typer.echo(f"   写出 sampling.yaml")
 
     # 覆盖检查
-    uncovered = [n for n, who in pset.coverage.items() if not who]
-    if uncovered:
-        typer.echo(f"   ⚠ 仍有 {len(uncovered)} 个 flow 节点无 persona 覆盖:{uncovered}")
+    if sset.uncovered:
+        typer.echo(f"   ⚠ 仍有 {len(sset.uncovered)} 个 flow 节点无剧本覆盖:{sset.uncovered}")
     else:
-        typer.echo("   ✓ 所有 flow 节点都有 persona 覆盖")
+        typer.echo("   ✓ 所有 flow 节点都有剧本覆盖")
 
     # ⑤ grader.py
     typer.echo("\n⑤ 生成 grader.py(模板填空)…")
@@ -617,10 +630,8 @@ def generate_task_cmd(
     typer.echo(f"\n═══ 完成 ═══")
     typer.echo(f"任务目录:tasks/{task_id}/")
     typer.echo(f"下一步:")
-    typer.echo(f"  1. 审核草稿:tasks/{task_id}/rubrics.draft.yaml & personas_draft/")
-    typer.echo(f"  2. 转正 rubric:claw-eval review --task {task_id}")
-    typer.echo(f"  3. 复制 personas_draft/ 想要的 persona 到 personas/")
-    typer.echo(f"  4. 跑批:claw-eval batch --task {task_id} --total 30 --label v1")
+    typer.echo(f"  1. 在 UI 审核 rubrics 和 personas 草稿")
+    typer.echo(f"  2. 跑批:claw-eval batch --task {task_id} --total 30 --label v1")
 
 
 @app.command()
@@ -689,14 +700,15 @@ def recommend(task: str = typer.Option(..., help="任务 id 或目录"),
         typer.echo(f"  请先跑 claw-eval batch --task {task} 产生评测结果")
         raise typer.Exit(1)
 
-    judge_model = None if no_judge else cfg["judge"]["model"]
+    c = _step_cfg(cfg, "recommend")
+    rec_model = None if no_judge else c["model"]
     typer.echo(f"分析 {len(results)} 个 result,找最弱 rubric…")
-    if judge_model:
-        typer.echo(f"将用 {judge_model} 生成可执行建议(可能 30-60s)")
+    if rec_model:
+        typer.echo(f"将用 {rec_model} 生成可执行建议(可能 30-60s)")
     recs = build_recommendations(
         task_def, results, rubrics,
-        judge_model=judge_model, top_n=top,
-        reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+        judge_model=rec_model, top_n=top,
+        reasoning_effort=c["reasoning_effort"])
 
     if not recs:
         typer.echo("✓ 没有明显弱的 rubric(全部 ≥0.8 或触发次数 <3)")
@@ -729,12 +741,11 @@ def extract_rubric_cmd(
     task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
     cfg = _load_models_cfg(config)
     _configure_provider(cfg)
-    judge_model = cfg["judge"]["model"]
+    c = _step_cfg(cfg, "extract_rubric")
 
-    typer.echo(f"调 LLM 抽取 rubric({judge_model})…")
+    typer.echo(f"调 LLM 抽取 rubric({c['model']})…")
     rubrics = extract_rubrics(
-        task_def, judge_model,
-        reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+        task_def, c["model"], reasoning_effort=c["reasoning_effort"])
 
     out_path = task_dir / out
     save_rubrics(rubrics, out_path, include_meta=True)
@@ -805,11 +816,12 @@ def extract_personas_cmd(
     task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
     cfg = _load_models_cfg(config)
     _configure_provider(cfg)
+    c = _step_cfg(cfg, "extract_personas")
 
-    typer.echo(f"调 LLM 抽取 persona({cfg['judge']['model']})…")
+    typer.echo(f"调 LLM 抽取 persona({c['model']})…")
     scripts = extract_personas(
-        task_def, cfg["judge"]["model"], _ROOT / "personalities",
-        reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+        task_def, c["model"], _ROOT / "personalities",
+        reasoning_effort=c["reasoning_effort"])
 
     out_path = task_dir / out_dir
     out_path.mkdir(parents=True, exist_ok=True)
@@ -865,22 +877,23 @@ def pipeline(task: str = typer.Option(..., help="任务 id 或目录"),
 
     # 1. extract-rubric
     if from_step <= 1:
-        hdr(1, "extract-rubric(LLM 抽 rubric → 草稿)")
+        c1 = _step_cfg(cfg, "extract_rubric")
+        hdr(1, f"extract-rubric({c1['model']})")
         task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
         rubrics = extract_rubrics(
-            task_def, cfg["judge"]["model"],
-            reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+            task_def, c1["model"], reasoning_effort=c1["reasoning_effort"])
         save_rubrics(rubrics, task_dir / "rubrics.draft.yaml",
                      include_meta=True)
         typer.echo(f"✓ {len(rubrics)} 条 → rubrics.draft.yaml")
 
     # 2. extract-personas
     if from_step <= 2:
-        hdr(2, "extract-personas(LLM 推荐 persona 剧本 → 草稿)")
+        c2 = _step_cfg(cfg, "extract_personas")
+        hdr(2, f"extract-personas({c2['model']})")
         task_def = TaskDefinition.from_yaml(task_dir / "task.yaml")
         scripts = extract_personas(
-            task_def, cfg["judge"]["model"], _ROOT / "personalities",
-            reasoning_effort=cfg["judge"].get("reasoning_effort", "medium"))
+            task_def, c2["model"], _ROOT / "personalities",
+            reasoning_effort=c2["reasoning_effort"])
         out = task_dir / "personas_draft"
         out.mkdir(parents=True, exist_ok=True)
         for s in scripts:

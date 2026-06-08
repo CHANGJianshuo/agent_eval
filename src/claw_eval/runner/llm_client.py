@@ -1,10 +1,11 @@
 """LiteLLM 封装 —— 统一各家模型接口 + 指数退避重试。
 
-支持 OpenAI 兼容的自建 / 第三方网关(如小米 MiMo 开放平台):
+支持 OpenAI 兼容的第三方网关(DeepSeek / MiMo 等):
 通过 configure() 设置 base_url 与 api_key,chat() 会自动以 openai/<model> 路由。
 """
 from __future__ import annotations
 
+import re
 import time
 
 _DEFAULT_API_BASE: str | None = None
@@ -25,8 +26,7 @@ def chat(model: str, messages: list[dict], temperature: float = 0.7,
          **kwargs) -> str:
     """调用对话模型,返回文本内容。失败时指数退避重试。
 
-    reasoning_effort: low/medium/high —— 推理模型用,显式设置可大幅加快
-    (实测 MiMo `low` 比默认快 5-8 倍,reasoning_tokens 从 700+ 降到 ~100)。
+    reasoning_effort: low/medium/high —— 推理模型用,显式设置可大幅加快。
     litellm 在函数内惰性导入。
     """
     import litellm  # noqa: PLC0415
@@ -43,7 +43,6 @@ def chat(model: str, messages: list[dict], temperature: float = 0.7,
         if "/" not in model:
             call_model = f"openai/{model}"
     if reasoning_effort:
-        # MiMo 收 top-level 的 reasoning_effort,通过 extra_body 透传最稳
         extra.setdefault("extra_body", {})["reasoning_effort"] = reasoning_effort
 
     last_err: Exception | None = None
@@ -57,7 +56,12 @@ def chat(model: str, messages: list[dict], temperature: float = 0.7,
                 **extra,
                 **kwargs,
             )
-            return (resp.choices[0].message.content or "").strip()
+            msg = resp.choices[0].message
+            text = msg.content or ""
+            if not text:
+                text = getattr(msg, "reasoning_content", "") or ""
+            text = re.sub(r"<think>[\s\S]*?</think>", "", text)
+            return text.strip()
         except Exception as exc:  # noqa: BLE001
             last_err = exc
             if attempt == max_retries - 1:

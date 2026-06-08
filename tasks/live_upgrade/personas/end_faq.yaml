@@ -1,0 +1,27 @@
+id: end_faq
+name: 结束通话前提问
+scenario: '你是负责人，知情，配合走完所有主流程，
+
+  Web控制台已可见，费用未设置，企业微信可添加。
+
+  在对方准备结束通话时，你问“如果中途想换成低延迟直播怎么操作？”。
+
+  对方解答后你表示没问题，通话结束。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- step4
+- step5
+- step6
+- end
+- faq
+probes:
+- id: trigger_faq_end
+  inject_at_turn: 7
+  text: 对了，如果我之后想换成低延迟直播，怎么操作？
+  description: 触发 faq 节点（从 end）
+max_rounds: 10

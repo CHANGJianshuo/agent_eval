@@ -8,6 +8,7 @@ import TestDetail from './pages/TestDetail'
 import Settings from './pages/Settings'
 import Docs from './pages/Docs'
 import { isBackendAvailable } from './lib/mockData'
+import { JobStore } from './lib/jobs'
 
 
 function DemoBanner() {
@@ -92,6 +93,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 
 export default function App() {
+  useEffect(() => { JobStore.syncFromBackend() }, [])
   return (
     <Layout>
       <Routes>

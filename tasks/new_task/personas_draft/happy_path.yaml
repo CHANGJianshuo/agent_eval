@@ -1,0 +1,17 @@
+id: happy_path
+name: 主流程完整路径
+scenario: '你是接到电话的骑手王小明。你确认身份后，对方告知合同生效、询问配送安排，
+
+  你表示可以配送并接受后续说明。在对方介绍连续配送天数、挽留鼓励、排名规则时，
+
+  你均简短回应“好的”“明白了”，不提出额外问题。流程结束你回复[DONE]。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- step4
+- end
+max_rounds: 8

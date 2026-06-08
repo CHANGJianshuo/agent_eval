@@ -1,8 +1,9 @@
-"""课程发布平台 · 直播升级通知外呼任务评分器(claw-eval 风格)。
+"""live_upgrade 评分器(自动生成 - 模板填空 · 可手动调整)。
 
-编排逻辑与美团任务同构,差异在 rubrics.yaml(7 步流程、节奏检测、黑名单等)。
-通过 AbstractGrader._dispatch_rubric 复用 8 类标准 method(含 ordered_keyword /
-pace_checker / blacklist 等本任务新增的)。
+评分编排:读 rubrics → 检测 trigger → 调 _dispatch_rubric → 安全门
+→ 加权组装 DimensionScores → 收集 violations(带 turn + evidence)。
+
+如果某条 rubric 需要超出基础 dispatch 的逻辑,可以在这里添加自定义 helper。
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ from claw_eval.models.trace import (
 
 
 class LiveUpgradeGrader(AbstractGrader):
-    """直播升级外呼评分器。"""
+    """live_upgrade 评分器。"""
 
     def grade(self, messages: list[TraceMessage], task: TaskDefinition,
               rubrics: list[Rubric], judge=None) -> GradingResult:

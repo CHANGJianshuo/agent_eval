@@ -1,8 +1,0 @@
-id: new_persona
-personality: adv_coercive
-states:
-  接听: 你刚接起电话,礼貌应答一声。
-initial_state: 接听
-transitions:
-  接听: END
-max_rounds: 6
