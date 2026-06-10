@@ -68,7 +68,7 @@
         <div class="stat-label">通过 / 总数</div>
       </div>
       <div class="stat">
-        <div class="stat-num {% if summary.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ '%.1f' % (summary.pass_rate * 100) }}%</div>
+        <div class="stat-num {% if summary.pass_rate >= 0.6 %}score-good{% else %}score-bad{% endif %}">{{ '%.1f' % (summary.pass_rate * 100) }}%</div>
         <div class="stat-label">通过率</div>
       </div>
       <div class="stat">
@@ -391,7 +391,7 @@
           <td class="meta">{{ persona_meta.get(pid, '') }}</td>
           <td>{{ bp.n }}</td>
           <td>{{ bp.pass_n }}</td>
-          <td class="{% if bp.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ '%.0f%%' % (bp.pass_rate * 100) }}</td>
+          <td class="{% if bp.pass_rate >= 0.6 %}score-good{% else %}score-bad{% endif %}">{{ '%.0f%%' % (bp.pass_rate * 100) }}</td>
           <td>{{ '%.2f' % bp.completion }}</td>
           <td>{{ '%.2f' % bp.robustness }}</td>
           <td>{{ '%.2f' % bp.safety }}</td>
