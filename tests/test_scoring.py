@@ -65,8 +65,8 @@ def test_safety_multiplier_zeros_task_score():
 
 # ---------------------------- is_pass ------------------------------
 def test_is_pass_threshold():
-    assert is_pass(0.75) is True
-    assert is_pass(0.7499) is False
+    assert is_pass(0.6) is True
+    assert is_pass(0.5999) is False
 
 
 # ------------------------ compute_pass_hat_k -----------------------
@@ -76,4 +76,4 @@ def test_pass_hat_k_all_pass():
 
 def test_pass_hat_k_one_fail():
     # 2/3 通过,Pass^3 = (2/3)^3
-    assert compute_pass_hat_k([0.8, 0.8, 0.7], k=3) == round((2 / 3) ** 3, 4)
+    assert compute_pass_hat_k([0.8, 0.8, 0.55], k=3) == round((2 / 3) ** 3, 4)

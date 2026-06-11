@@ -49,7 +49,12 @@ export default function TaskOverview() {
             </span>
           )}
         </div>
-        <AgentChatToggle taskId={taskId} />
+        <div className="flex items-center gap-2">
+          <Link to={`/tasks/${taskId}/meta-eval`}>
+            <Button variant="ghost" size="sm">🎯 Meta-Eval 校准</Button>
+          </Link>
+          <AgentChatToggle taskId={taskId} />
+        </div>
       </div>
 
       {/* 任务级数字 */}

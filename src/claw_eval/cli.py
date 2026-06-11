@@ -42,17 +42,38 @@ def _task_dir(task: str) -> Path:
     return p if p.is_dir() else _ROOT / "tasks" / task
 
 
+def _load_saved_api_key(key_env: str) -> str | None:
+    """从 ~/.claw_eval/api_keys.yaml(UI「全局配置」保存的)读 key。
+
+    文件按 provider 名存(如 deepseek),env 名 DEEPSEEK_API_KEY → provider deepseek。
+    """
+    keys_file = Path.home() / ".claw_eval" / "api_keys.yaml"
+    if not keys_file.exists():
+        return None
+    try:
+        keys = yaml.safe_load(keys_file.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        return None
+    provider = key_env.removesuffix("_API_KEY").lower()
+    return keys.get(provider) or None
+
+
 def _configure_provider(cfg: dict) -> None:
-    """按 models.yaml 的 provider 段配置 LLM 网关(OpenAI 兼容)。"""
+    """按 models.yaml 的 provider 段配置 LLM 网关(OpenAI 兼容)。
+
+    key 寻找顺序:环境变量 → ~/.claw_eval/api_keys.yaml(UI 保存)。
+    """
     prov = cfg.get("provider")
     if not prov:
         return
     base_url = prov.get("base_url")
     key_env = prov.get("api_key_env", "")
     api_key = os.environ.get(key_env) if key_env else None
+    if not api_key and key_env:
+        api_key = _load_saved_api_key(key_env)
     if base_url and not api_key:
-        typer.echo(f"[warning] 环境变量 {key_env} 未设置,LLM 调用会失败。"
-                   f"请先 export {key_env}=<你的 API key>")
+        typer.echo(f"[warning] {key_env} 未设置(环境变量和 UI 保存的都没有),"
+                   f"LLM 调用会失败。export {key_env}=<key> 或在网页「全局配置」里填")
     llm_client.configure(api_base=base_url, api_key=api_key)
 
 
@@ -1042,6 +1063,72 @@ def validate(task: str = typer.Option(..., help="任务 id 或目录")):
     else:
         typer.echo(f"\n✗ 校验失败:{len(rep.errors)} 错误")
         raise typer.Exit(1)
+
+
+@app.command("meta-eval")
+def meta_eval_cmd(
+        task: str = typer.Option(..., help="任务 id"),
+        sample: int = typer.Option(
+            0, help="≥1 时执行抽样:分层抽 N 条 LLM Judge 评分供人工标注"),
+        run_id: str = typer.Option("", help="限定某次测试;留空 = 全部历史"),
+        seed: int = typer.Option(42)):
+    """Meta-Eval 人工校准 —— 抽样标注任务 / 输出人机一致率报告。
+
+    用法:
+      claw-eval meta-eval --task live_upgrade --sample 30   # 1. 抽样
+      (网页「Meta-Eval 校准」页逐条标注,或手编 annotations JSONL)
+      claw-eval meta-eval --task live_upgrade               # 2. 看校准报告
+    """
+    from .meta_eval import (
+        collect_judge_scores, compute_calibration,
+        load_annotations, load_samples, save_samples, stratified_sample,
+    )
+    task_dir = _task_dir(task)
+    task_id = task_dir.name
+
+    if sample > 0:
+        items = collect_judge_scores(_ROOT / "traces", task_id=task_id,
+                                     run_id=run_id or None)
+        if not items:
+            typer.echo("[error] 没有可抽样的 LLM Judge 评分;先跑一次带 Judge 的测试")
+            raise typer.Exit(1)
+        picked = stratified_sample(items, n=sample, seed=seed)
+        p = save_samples(_ROOT, task_id, picked)
+        rubrics = sorted({i.rubric_id for i in picked})
+        typer.echo(f"✓ 从 {len(items)} 条 Judge 评分中分层抽出 {len(picked)} 条")
+        typer.echo(f"  覆盖 {len(rubrics)} 个 rubric:{', '.join(rubrics)}")
+        typer.echo(f"  样本文件:{p}")
+        typer.echo(f"  → 打开网页「任务 → Meta-Eval 校准」逐条标注")
+        return
+
+    samples = load_samples(_ROOT, task_id)
+    if not samples:
+        typer.echo("[error] 还没抽样。先 --sample 30")
+        raise typer.Exit(1)
+    anns = load_annotations(_ROOT, task_id)
+    rep = compute_calibration(samples, anns)
+    typer.echo(f"\n═══ Meta-Eval 校准报告 · {task_id} ═══")
+    typer.echo(f"  标注进度: {rep.n_annotated}/{rep.n_samples}")
+    if rep.n_annotated == 0:
+        typer.echo("  (还没有标注,先去网页标注)")
+        return
+    typer.echo(f"  人机一致率: {rep.agreement_rate:.1%}   "
+               f"(|judge-human| ≤ 0.2 算一致)")
+    bias_desc = "Judge 偏松" if rep.mean_bias > 0.05 else (
+        "Judge 偏严" if rep.mean_bias < -0.05 else "无系统性偏差")
+    typer.echo(f"  系统性偏差: {rep.mean_bias:+.3f}({bias_desc})")
+    typer.echo("\n  按 rubric:")
+    for rid, br in sorted(rep.by_rubric.items(),
+                          key=lambda kv: kv[1]["agreement_rate"]):
+        flag = " ⚠ 不可靠" if br["agreement_rate"] < 0.7 else ""
+        typer.echo(f"    {rid:40} 一致率 {br['agreement_rate']:.0%} "
+                   f"(n={br['n']}, bias {br['mean_bias']:+.2f}){flag}")
+    if rep.disagreements:
+        typer.echo(f"\n  分歧 case({len(rep.disagreements)} 条):")
+        for d in rep.disagreements[:5]:
+            typer.echo(f"    {d['item_id']}")
+            typer.echo(f"      judge={d['judge_score']} human={d['human_score']}"
+                       f"  {d['comment']}")
 
 
 def main() -> None:

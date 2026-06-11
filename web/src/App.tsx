@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn'
 import TaskList from './pages/TaskList'
 import TaskOverview from './pages/TaskOverview'
 import TestDetail from './pages/TestDetail'
+import MetaEval from './pages/MetaEval'
 import Settings from './pages/Settings'
 import Docs from './pages/Docs'
 import { isBackendAvailable } from './lib/mockData'
@@ -100,6 +101,7 @@ export default function App() {
         <Route path="/" element={<TaskList />} />
         <Route path="/tasks/:taskId" element={<TaskOverview />} />
         <Route path="/tests/:testId" element={<TestDetail />} />
+        <Route path="/tasks/:taskId/meta-eval" element={<MetaEval />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/docs" element={<Docs />} />
         <Route path="*" element={<Navigate to="/" replace />} />

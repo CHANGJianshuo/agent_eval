@@ -1,4 +1,9 @@
-"""Persona 三层加载 + 噪音 rate 单测 —— 不依赖 API。"""
+"""Persona 三层加载 + 噪音 rate 单测 —— 不依赖 API。
+
+剧本 fixture 放 tests/fixtures/personas_v1/(v1 状态机格式),
+不直接依赖 tasks/ 下的活配置 —— 任务内容会随评测演化,测试不该跟着碎。
+v2 格式(scenario 自然语言剧本)单独造最小 YAML 测。
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,21 +24,14 @@ from claw_eval.user_simulator.state_machine import StateMachine
 _ROOT = Path(__file__).resolve().parents[1]
 _PERS = _ROOT / "personalities"
 _NOISE = _ROOT / "configs" / "noise_profiles.yaml"
+_FIXTURES = Path(__file__).parent / "fixtures" / "personas_v1"
 
-_ALL = [
-    ("meituan_rider", p) for p in
-    ["cooperative", "refuse", "hesitant", "out_of_scope",
-     "info_missing", "argumentative"]
-] + [
-    ("live_upgrade", p) for p in
-    ["cooperative_owner", "invisible_channel", "driving",
-     "busy_owner", "discount_seeker", "non_owner"]
-]
+_ALL_V1 = ["cooperative", "refuse", "cooperative_owner"]
 
 
-def _load(task: str, persona: str):
+def _load(persona: str):
     return load_persona(
-        _ROOT / "tasks" / task / "personas" / f"{persona}.yaml",
+        _FIXTURES / f"{persona}.yaml",
         personalities_dir=_PERS, noise_file=_NOISE)
 
 
@@ -59,9 +57,9 @@ def test_noise_kinds_library():
 
 # ------------------------- 三层合成 persona -------------------------
 
-@pytest.mark.parametrize("task,persona", _ALL)
-def test_persona_merges_three_layers(task: str, persona: str):
-    p = _load(task, persona)
+@pytest.mark.parametrize("persona", _ALL_V1)
+def test_persona_merges_three_layers(persona: str):
+    p = _load(persona)
     # 剧本层
     assert p.states and p.initial_state and p.transitions
     # 性格层(合成进来了)
@@ -71,24 +69,62 @@ def test_persona_merges_three_layers(task: str, persona: str):
     assert p.noise_kinds == []
 
 
-@pytest.mark.parametrize("task,persona", _ALL)
-def test_every_persona_state_machine_terminates(task: str, persona: str):
-    sm = StateMachine(_load(task, persona))
+@pytest.mark.parametrize("persona", _ALL_V1)
+def test_every_persona_state_machine_terminates(persona: str):
+    sm = StateMachine(_load(persona))
     seen = [sm.current]
     for _ in range(30):
         if sm.advance():
             break
         seen.append(sm.current)
-    assert sm.finished, f"{task}/{persona} 状态机未终止: {seen}"
+    assert sm.finished, f"{persona} 状态机未终止: {seen}"
 
 
-def test_personality_is_reused_across_tasks():
+def test_personality_is_reused_across_scripts():
     """同一性格被多任务剧本复用 —— 三层拆分的核心收益。"""
-    mt = _load("meituan_rider", "cooperative")
-    lv = _load("live_upgrade", "cooperative_owner")
+    mt = _load("cooperative")
+    lv = _load("cooperative_owner")
     assert mt.personality_id == lv.personality_id == "cooperative"
     assert mt.description == lv.description
     assert mt.states != lv.states
+
+
+# --------------------- v2 剧本(scenario 自然语言) ---------------------
+
+def test_v2_script_without_personality_loads(tmp_path):
+    """v2 剧本只有 scenario,没有 personality/states —— 必须能加载。
+
+    回归保护:曾因 load_persona 强制读 personality 文件,
+    v2 剧本全部静默加载失败(find_all_scripts 吞异常)。
+    """
+    f = tmp_path / "happy_path.yaml"
+    f.write_text(
+        "id: happy_path\n"
+        "name: 全程配合\n"
+        "scenario: 你是机构负责人,全程配合客服走完通知流程。\n"
+        "max_rounds: 10\n",
+        encoding="utf-8")
+    p = load_persona(f, personalities_dir=_PERS, noise_file=_NOISE)
+    assert p.id == "happy_path"
+    assert p.scenario
+    assert p.description          # 有兜底人设
+    assert p.speaking_style
+
+
+def test_v2_script_with_probes(tmp_path):
+    f = tmp_path / "probe_script.yaml"
+    f.write_text(
+        "id: probe_script\n"
+        "scenario: 中途问超范围问题。\n"
+        "probes:\n"
+        "  - id: ask_oob\n"
+        "    inject_at_turn: 3\n"
+        "    text: 你们倒闭了我的钱退吗?\n"
+        "    description: 越界问题\n",
+        encoding="utf-8")
+    p = load_persona(f, personalities_dir=_PERS, noise_file=_NOISE)
+    assert len(p.probes) == 1
+    assert p.probes[0].inject_at_turn == 3
 
 
 # ---------------------- 噪音 rate(per-turn 掷骰)----------------------

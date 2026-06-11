@@ -8,7 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import routes_tasks, routes_tests, routes_personas, routes_config
+from . import (
+    routes_config,
+    routes_meta_eval,
+    routes_personas,
+    routes_tasks,
+    routes_tests,
+)
 
 
 def create_app() -> FastAPI:
@@ -47,6 +53,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_tests.router, prefix="/api", tags=["tests"])
     app.include_router(routes_personas.router, prefix="/api", tags=["personas"])
     app.include_router(routes_config.router, prefix="/api", tags=["config"])
+    app.include_router(routes_meta_eval.router, prefix="/api",
+                       tags=["meta-eval"])
 
     # 生产环境:挂载前端 build 产物(dev 时跳过)
     web_dist = _find_web_dist()

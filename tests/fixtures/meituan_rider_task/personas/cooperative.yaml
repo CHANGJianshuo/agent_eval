@@ -1,0 +1,22 @@
+# 剧本层 —— 引用性格 personalities/cooperative.yaml + 噪音档 clean。
+id: cooperative
+personality: cooperative
+name: 合作型骑手
+
+initial_state: 接听
+states:
+  接听: 你刚接起电话,礼貌应答一声。
+  听介绍: 你在听站长介绍飞毛腿的事,简单回应表示明白。
+  确认: 你表示愿意今天就开始跑单,顺便确认一下细节。
+transitions:
+  接听: 听介绍
+  听介绍: 确认
+  确认: END
+
+probes:
+  - id: ask_exit
+    inject_at_turn: 2
+    text: 我大概明白了。那要是哪天我想退出飞毛腿,该怎么弄?
+    description: 询问退出规则,触发 faq.exit_rule
+
+max_rounds: 6

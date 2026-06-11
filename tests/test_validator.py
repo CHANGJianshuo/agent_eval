@@ -132,14 +132,15 @@ def test_sampling_missing_personas_info():
 
 # ---- 端到端:实际任务应通过 ----
 
-def test_meituan_task_validates_clean():
+def test_fixture_task_validates_clean():
+    fixture = Path(__file__).parent / "fixtures" / "meituan_rider_task"
     rep = validate_task(
-        _ROOT / "tasks" / "meituan_rider",
+        fixture,
         personalities_dir=_ROOT / "personalities",
         noise_file=_ROOT / "configs" / "noise_profiles.yaml",
-        sampling_file=_ROOT / "tasks" / "meituan_rider" / "sampling.yaml",
+        sampling_file=fixture / "sampling.yaml",
     )
-    assert rep.ok, f"美团校验有错误: {rep.errors}"
+    assert rep.ok, f"fixture 校验有错误: {rep.errors}"
 
 
 def test_live_upgrade_task_validates_clean():

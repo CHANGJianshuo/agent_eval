@@ -57,7 +57,7 @@
   <div class="card">
     <div class="back"><a href="index.html">← 返回跨任务总览</a></div>
     <h1>{{ task_name }}</h1>
-    <div class="meta">任务 id:{{ task_id }} · 单任务评测详情(persona × rubric 细分)</div>
+    <div class="meta">任务 id:{{ task_id }} · 单任务评测详情(剧本 × rubric 细分)</div>
     <div class="stats">
       <div class="stat">
         <div class="stat-num">{{ summary.total_runs }}</div>
@@ -369,25 +369,22 @@
   {% endif %}
 
   <div class="card">
-    <h2>按 Persona 看(模拟用户具体数据)</h2>
+    <h2>按剧本看(场景路径粒度)</h2>
+    <div class="legend">
+      <span>剧本 = 模拟用户在对话中走的场景路径(全程配合 / 开车挂断 / 中途 FAQ…)。
+        同一剧本可配不同性格/年龄等特点多次运行,此处合并统计。</span>
+    </div>
     <table>
       <thead><tr>
-        <th>Persona</th>
-        <th>MBTI</th><th>年龄</th><th>性别</th><th>教育</th><th>态度</th>
-        <th style="min-width:200px;">说明</th>
+        <th>剧本</th>
+        <th style="min-width:260px;">场景说明</th>
         <th>运行数</th><th>通过</th><th>通过率</th>
         <th>完成度</th><th>鲁棒性</th><th>安全</th>
       </tr></thead>
       <tbody>
       {% for pid, bp in summary.by_persona.items() %}
-        {% set demo = persona_demo.get(pid, {}) %}
         <tr>
           <td><strong>{{ pid }}</strong></td>
-          <td class="meta">{{ demo.get('mbti', '—') }}</td>
-          <td class="meta">{{ demo.get('age', '—') }}</td>
-          <td class="meta">{{ demo.get('gender', '—') }}</td>
-          <td class="meta">{{ demo.get('education', '—') }}</td>
-          <td class="meta">{{ demo.get('attitude', '—') }}</td>
           <td class="meta">{{ persona_meta.get(pid, '') }}</td>
           <td>{{ bp.n }}</td>
           <td>{{ bp.pass_n }}</td>
@@ -402,9 +399,9 @@
   </div>
 
   <div class="card">
-    <h2>Persona × Rubric 热力图</h2>
+    <h2>剧本 × Rubric 热力图</h2>
     <div class="legend">
-      <span>行 = persona,列 = 本任务 rubric。底色按维度
+      <span>行 = 剧本(场景路径),列 = 本任务 rubric。底色按维度
         (<span class="dim-comp-text">蓝完成度</span> /
          <span class="dim-robu-text">橙鲁棒性</span> /
          <span class="dim-safe-text">绿安全</span>),深浅按得分。
@@ -414,7 +411,7 @@
       <table class="heat">
         <thead>
           <tr>
-            <th class="row-head">Persona \ Rubric</th>
+            <th class="row-head">剧本 \ Rubric</th>
             {% for rid in summary.rubric_order %}
               {% set dim = summary.rubric_dim.get(rid, '') %}
               <th class="col-head">
@@ -448,7 +445,7 @@
   </div>
 
   <div class="card">
-    <h2>按 Rubric 看(全 persona 合并)</h2>
+    <h2>按 Rubric 看(全剧本合并)</h2>
     <table>
       <thead><tr>
         <th>维度</th><th>Rubric</th>
@@ -474,14 +471,14 @@
     <h2>全部运行 ({{ summary.runs|length }})</h2>
     <table>
       <thead><tr>
-        <th>#</th><th>Persona</th><th>task_score</th>
+        <th>#</th><th>剧本</th><th>task_score</th>
         <th>完成度</th><th>鲁棒性</th><th>安全</th><th>结果</th><th>详情</th>
       </tr></thead>
       <tbody>
       {% for r in summary.runs %}
         <tr>
           <td>{{ loop.index }}</td>
-          <td>{{ r.persona_id }}</td>
+          <td>{{ r.script_id or r.persona_id }}</td>
           <td class="{% if r.passed %}score-good{% else %}score-bad{% endif %}">{{ '%.4f' % r.task_score }}</td>
           <td>{{ '%.2f' % r.completion }}</td>
           <td>{{ '%.2f' % r.robustness }}</td>

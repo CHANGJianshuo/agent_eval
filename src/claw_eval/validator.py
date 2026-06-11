@@ -138,6 +138,9 @@ def check_state_termination(personas: list[Persona],
     out: list[Issue] = []
     END_S = "END"
     for p in personas:
+        # v2 剧本(scenario 自然语言)没有状态机,跳过该检查
+        if getattr(p, "scenario", "") and not any(p.states.keys()):
+            continue
         # 邻接表:每个 state → 所有可能的下一站
         adj: dict[str, set[str]] = {}
         for src in p.states.keys():

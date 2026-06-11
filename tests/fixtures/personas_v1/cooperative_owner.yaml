@@ -1,0 +1,26 @@
+# 剧本层 —— 引用性格 personalities/cooperative.yaml(与美团 cooperative 同一性格)。
+id: cooperative_owner
+personality: cooperative
+name: 配合型机构负责人
+
+initial_state: 接听
+states:
+  接听: 你刚接起电话,礼貌应答。
+  确认身份: 你说你就是负责人,让客服讲。
+  听介绍: 你听客服讲两种直播,简单回应。
+  问区别: 你顺势问下两种直播的区别在哪。
+  收尾: 你说大致了解了,客服可以发企微加你。
+transitions:
+  接听: 确认身份
+  确认身份: 听介绍
+  听介绍: 问区别
+  问区别: 收尾
+  收尾: END
+
+probes:
+  - id: ask_difference
+    inject_at_turn: 4
+    text: 那这俩直播,延迟和适用场景具体啥区别?
+    description: 问两种直播的区别,触发 faq.latency_explanation
+
+max_rounds: 8

@@ -36,9 +36,10 @@ def test_aggregate_empty():
 
 
 def test_aggregate_totals_and_avgs():
+    # passed 由 aggregate 按 PASS_THRESHOLD(0.6) 重算,不信任入参
     results = [
         _result("p1", 0.80, True, 1.0, 0.5, 1.0, []),
-        _result("p2", 0.60, False, 0.8, 0.0, 1.0, []),
+        _result("p2", 0.55, False, 0.8, 0.0, 1.0, []),
     ]
     s = aggregate(results)
     assert s.total_runs == 2
@@ -53,7 +54,7 @@ def test_aggregate_by_persona_rolls_up_multiple_trials():
     # p1 跑两次:1 过 1 不过 → pass_rate 0.5
     results = [
         _result("p1", 0.80, True, 1.0, 1.0, 1.0, []),
-        _result("p1", 0.60, False, 0.8, 0.0, 1.0, []),
+        _result("p1", 0.55, False, 0.8, 0.0, 1.0, []),
         _result("p2", 0.90, True, 1.0, 0.5, 1.0, []),
     ]
     s = aggregate(results)
@@ -84,6 +85,23 @@ def test_aggregate_by_rubric_skips_untriggered():
     # rubric_order 记录全部出现过的(含未触发的)
     assert s.rubric_order == ["flow.x", "faq.y", "safety.z"]
     assert s.rubric_dim["safety.z"] == "safety"
+
+
+def test_aggregate_groups_by_script_id_when_present():
+    """--dimensions 模式下 persona_id 是随机生成 ID,分组应按 script_id。"""
+    r1 = _result("gen_t1_coop_xxx", 0.9, True, 1.0, 1.0, 1.0, [])
+    r1.script_id = "happy_path"
+    r2 = _result("gen_t2_refuse_yyy", 0.3, False, 0.3, 0.5, 1.0, [])
+    r2.script_id = "happy_path"
+    r3 = _result("gen_t3_coop_zzz", 0.8, True, 0.9, 0.7, 1.0, [])
+    r3.script_id = "driving_hangup"
+    s = aggregate([r1, r2, r3])
+    # 按剧本合并,不是按 persona_id
+    assert set(s.by_persona.keys()) == {"happy_path", "driving_hangup"}
+    assert s.by_persona["happy_path"]["n"] == 2
+    assert s.by_persona["driving_hangup"]["n"] == 1
+    # runs 表也带 script_id
+    assert s.runs[0]["script_id"] == "happy_path"
 
 
 def test_aggregate_heatmap_structure():

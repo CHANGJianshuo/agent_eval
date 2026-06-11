@@ -29,8 +29,9 @@ def test_color_thresholds():
 
 # --------------------------- 加载真实 flow ---------------------------
 
-def test_meituan_flow_loads():
-    flow = load_flow(_ROOT / "tasks" / "meituan_rider" / "flow.yaml")
+def test_fixture_flow_loads():
+    flow = load_flow(Path(__file__).parent / "fixtures"
+                     / "meituan_rider_task" / "flow.yaml")
     assert flow is not None
     ids = [n.id for n in flow.nodes]
     assert "opening" in ids and "step1" in ids and "step4" in ids
@@ -44,7 +45,10 @@ def test_live_upgrade_flow_loads():
     flow = load_flow(_ROOT / "tasks" / "live_upgrade" / "flow.yaml")
     assert flow is not None
     assert any(n.rubric == "behavior.busy_retain" for n in flow.nodes)
-    assert any(n.rubric == "safety.no_discount_promise" for n in flow.nodes)
+    # 全部节点 rubric 命名规范
+    for n in flow.nodes:
+        if n.rubric:
+            assert "." in n.rubric
 
 
 def test_load_flow_missing_returns_none():

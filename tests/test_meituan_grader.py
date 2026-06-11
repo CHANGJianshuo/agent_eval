@@ -12,7 +12,8 @@ from claw_eval.models.rubric import load_rubrics
 from claw_eval.models.task import TaskDefinition
 from claw_eval.models.trace import TraceMessage
 
-_TASK_DIR = Path(__file__).resolve().parents[1] / "tasks" / "meituan_rider"
+# 冻结的任务 fixture(不依赖 tasks/ 活配置 —— 任务内容会演化,测试不该跟着碎)
+_TASK_DIR = Path(__file__).parent / "fixtures" / "meituan_rider_task"
 
 
 class StubJudge:

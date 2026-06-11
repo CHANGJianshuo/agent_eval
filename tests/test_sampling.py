@@ -65,12 +65,15 @@ def test_allocate_realistic_meituan_distribution():
 _ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_load_meituan_sampling_yaml():
-    cfg = load_sampling(_ROOT / "tasks" / "meituan_rider" / "sampling.yaml")
+def test_load_fixture_sampling_yaml():
+    cfg = load_sampling(Path(__file__).parent / "fixtures"
+                        / "meituan_rider_task" / "sampling.yaml")
     assert cfg.weights["cooperative"] > 0
     assert sum(cfg.weights.values()) > 0
 
 
 def test_load_live_upgrade_sampling_yaml():
     cfg = load_sampling(_ROOT / "tasks" / "live_upgrade" / "sampling.yaml")
-    assert cfg.weights["cooperative_owner"] > 0
+    # v2 剧本权重(剧本名会演化,只验证结构)
+    assert cfg.weights
+    assert all(w > 0 for w in cfg.weights.values())

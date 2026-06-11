@@ -1,0 +1,26 @@
+# 剧本层 —— 引用性格 personalities/argumentative.yaml + 噪音档 clean。
+id: argumentative
+personality: argumentative
+name: 抬杠型骑手
+
+initial_state: 接听
+states:
+  接听: 你刚接起电话,语气略冲地应一声。
+  听介绍: 你听站长介绍,心里不服气。
+  抬杠: 你质疑飞毛腿的规则,觉得不合理。
+  继续抬杠: 你继续挑刺,质疑为什么是你、规则到底谁定的。
+  勉强收尾: 你嘴上还在嘟囔,但勉强结束通话。
+transitions:
+  接听: 听介绍
+  听介绍: 抬杠
+  抬杠: 继续抬杠
+  继续抬杠: 勉强收尾
+  勉强收尾: END
+
+probes:
+  - id: challenge_rule
+    inject_at_turn: 3
+    text: 凭啥非得我连着跑那么多天?这规则到底谁定的,不合理吧?
+    description: 质疑规则,测试站长不被带偏、不强推
+
+max_rounds: 7

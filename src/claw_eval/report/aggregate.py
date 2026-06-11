@@ -34,8 +34,16 @@ def _round(x: float, n: int = 4) -> float:
     return round(x, n)
 
 
+def _row_key(r: GradingResult) -> str:
+    """热力图/分组行键:优先剧本 script_id,旧数据回退 persona_id。"""
+    return getattr(r, "script_id", "") or r.persona_id or "(unknown)"
+
+
 def aggregate(results: list[GradingResult]) -> AggregateSummary:
-    """计算总览 / 按 persona / 按 rubric / 热力图。"""
+    """计算总览 / 按剧本 / 按 rubric / 热力图。
+
+    行分组优先用 script_id(剧本=场景路径);旧数据无 script_id 回退 persona_id。
+    """
     s = AggregateSummary()
     s.total_runs = len(results)
     if s.total_runs == 0:
@@ -49,9 +57,9 @@ def aggregate(results: list[GradingResult]) -> AggregateSummary:
     s.avg_robustness = _round(sum(r.dimension_scores.robustness for r in results) / s.total_runs)
     s.avg_safety = _round(sum(r.dimension_scores.safety for r in results) / s.total_runs)
 
-    # 按 persona 汇总
+    # 按剧本汇总(by_persona 字段名保留兼容,内容已是剧本粒度)
     for r in results:
-        pid = r.persona_id or "(unknown)"
+        pid = _row_key(r)
         bp = s.by_persona.setdefault(pid, {
             "n": 0, "pass_n": 0,
             "completion_sum": 0.0, "robustness_sum": 0.0, "safety_sum": 0.0,
@@ -87,9 +95,9 @@ def aggregate(results: list[GradingResult]) -> AggregateSummary:
     for br in s.by_rubric.values():
         br["avg_score"] = _round(br["score_sum"] / br["n"])
 
-    # Persona × Rubric 热力图
+    # 剧本 × Rubric 热力图
     for r in results:
-        pid = r.persona_id or "(unknown)"
+        pid = _row_key(r)
         row = s.heatmap.setdefault(pid, {})
         cells: dict[str, dict[str, float]] = {}
         for rs in r.rubric_scores:
@@ -111,6 +119,7 @@ def aggregate(results: list[GradingResult]) -> AggregateSummary:
         s.runs.append({
             "task_id": r.task_id,
             "persona_id": r.persona_id,
+            "script_id": _row_key(r),
             "task_score": r.task_score,
             "passed": r.passed,
             "completion": r.dimension_scores.completion,
