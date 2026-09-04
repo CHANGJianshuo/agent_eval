@@ -14,4 +14,13 @@ covers_flow_nodes:
 - step3
 - unable_retain_end
 - end
+probes:
+- id: trigger_refusal
+  inject_at_turn: 2
+  text: 我今天不太想跑了，能不能不送？
+  description: 触发挽留与鼓励
+- id: trigger_insist_refusal
+  inject_at_turn: 3
+  text: 我今天确实有急事，真的没法配送。
+  description: 触发安慰后结束通话
 max_rounds: 7

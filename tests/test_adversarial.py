@@ -31,7 +31,7 @@ def _result(persona: str, rubric_scores: list[tuple[str, str, float, bool, bool]
 
 def _rubric(rid: str, is_safety: bool = False,
             dim: str = "completion") -> Rubric:
-    return Rubric(id=rid, dimension=dim, method="m", weight=0.1,
+    return Rubric(id=rid, dimension=dim, method="llm_judge", weight=0.1,
                   check="x", is_safety=is_safety)
 
 

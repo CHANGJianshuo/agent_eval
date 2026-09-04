@@ -30,7 +30,8 @@ interface Props {
 
 export function NewTestForm({ taskId, onCancel, onStarted }: Props) {
   const [testId, setTestId] = useState(
-    `test_${new Date().toISOString().slice(5, 16).replace(/[-:T]/g, '_')}`)
+    `test_${new Date().toISOString().slice(5, 16)
+      .replace('-', '_').replace('T', '_').replace(':', '_')}`)
   const [total, setTotal] = useState<number | null>(null)
   const [noJudge, setNoJudge] = useState(false)
   const [autoRec, setAutoRec] = useState(false)

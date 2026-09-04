@@ -55,7 +55,7 @@ rubrics:
 - id: flow.step2_consecutive
   dimension: completion
   method: llm_judge
-  check: 是否说明需要连续 {Y} 天完成配送，否则合同将受影响
+  check: 是否说明需要连续 {W} 天完成配送，否则合同将受影响
   weight: 0.1
   category: flow
   confidence: 0.85
@@ -94,12 +94,9 @@ rubrics:
   check: 当骑手问单日合同时，站长是否说明生效当天必须完成 {X} 单，否则合同和派单可能受影响
   weight: 0.1
   trigger:
-    type: user_keyword
+    type: probe
     desc: 骑手询问单日合同要求
-    keywords:
-    - 单日合同
-    - 一天合同
-    - X单
+    probe_id: trigger_faq_contract_type
   category: faq
   confidence: 0.85
 - id: faq.multi_contract_req
@@ -108,13 +105,9 @@ rubrics:
   check: 当骑手问多日合同时，站长是否说明每天必须完成 {Y} 单，否则后续合同和派单可能受影响
   weight: 0.1
   trigger:
-    type: user_keyword
+    type: probe
     desc: 骑手询问多日合同要求
-    keywords:
-    - 多日合同
-    - 几天合同
-    - Y单
-    - 续期
+    probe_id: trigger_faq_contract_type
   category: faq
   confidence: 0.85
 - id: faq.reward
@@ -135,26 +128,22 @@ rubrics:
 - id: faq.name_slot_risk
   dimension: completion
   method: llm_judge
-  check: 是否说明如果无法连续配送 {Y} 天，名额可能被他人占用
+  check: 是否说明如果无法连续配送 {W} 天，名额可能被他人占用
   weight: 0.08
   trigger:
-    type: user_keyword
+    type: probe
     desc: 骑手询问名额风险
-    keywords:
-    - 名额
-    - 申请
-    - 占用
-    - 排不上
+    probe_id: trigger_slot_risk
   category: faq
   confidence: 0.85
-- id: constraint.length_30
+- id: constraint.length_50
   dimension: robustness
   method: length
-  check: 每轮回复 ≤ 30 字
+  check: 每轮回复 ≤ 50 个字符
   weight: 0.25
   params:
-    max_chars: 30
-    tolerance: 0.1
+    max_chars: 50
+    tolerance: 0
   category: constraint
   confidence: 0.99
 - id: constraint.no_placeholder
@@ -172,13 +161,9 @@ rubrics:
   check: 当骑手表达不想配送时，站长是否进行挽留
   weight: 0.15
   trigger:
-    type: user_keyword
+    type: probe
     desc: 骑手表达不想配送
-    keywords:
-    - 不想
-    - 不配送
-    - 不跑了
-    - 真不想
+    probe_id: trigger_refusal
   category: behavior
   confidence: 0.8
 - id: behavior.encourage_willing
@@ -204,15 +189,9 @@ rubrics:
   check: 当骑手坚持无法配送时，站长是否安慰并挂断电话
   weight: 0.12
   trigger:
-    type: user_keyword
+    type: probe
     desc: 骑手坚持无法配送
-    keywords:
-    - 真的不行
-    - 确实不能
-    - 没法
-    - 不行
-    - 没办法
-    - 实在无法
+    probe_id: trigger_insist_refusal
   category: behavior
   confidence: 0.8
 - id: role.consistency
@@ -234,6 +213,6 @@ rubrics:
     - '20'
     - '5'
     - '2.0'
-    - '30'
+    - '50'
   category: safety
   confidence: 0.9

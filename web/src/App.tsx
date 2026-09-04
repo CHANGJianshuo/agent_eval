@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 
-import TaskList from './pages/TaskList'
-import TaskOverview from './pages/TaskOverview'
-import TestDetail from './pages/TestDetail'
-import MetaEval from './pages/MetaEval'
-import Settings from './pages/Settings'
-import Docs from './pages/Docs'
 import { isBackendAvailable } from './lib/mockData'
 import { JobStore } from './lib/jobs'
+
+
+const TaskList = lazy(() => import('./pages/TaskList'))
+const TaskOverview = lazy(() => import('./pages/TaskOverview'))
+const TestDetail = lazy(() => import('./pages/TestDetail'))
+const MetaEval = lazy(() => import('./pages/MetaEval'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Docs = lazy(() => import('./pages/Docs'))
 
 
 function DemoBanner() {
@@ -77,7 +79,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <a
-              href="http://localhost:8000/docs"
+              href="/api/docs"
               target="_blank"
               rel="noopener"
               className="text-[11px] text-muted-foreground hover:text-foreground"
@@ -97,15 +99,17 @@ export default function App() {
   useEffect(() => { JobStore.syncFromBackend() }, [])
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<TaskList />} />
-        <Route path="/tasks/:taskId" element={<TaskOverview />} />
-        <Route path="/tests/:testId" element={<TestDetail />} />
-        <Route path="/tasks/:taskId/meta-eval" element={<MetaEval />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/docs" element={<Docs />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">加载中…</div>}>
+        <Routes>
+          <Route path="/" element={<TaskList />} />
+          <Route path="/tasks/:taskId" element={<TaskOverview />} />
+          <Route path="/tests/:testId" element={<TestDetail />} />
+          <Route path="/tasks/:taskId/meta-eval" element={<MetaEval />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/docs" element={<Docs />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Layout>
   )
 }

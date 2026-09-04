@@ -10,6 +10,7 @@ from claw_eval.models.trace import (
     RubricScore,
     Violation,
 )
+from claw_eval.report import builder
 from claw_eval.report.builder import build_case_report, build_dashboard
 
 
@@ -84,6 +85,23 @@ def test_build_case_report(tmp_path: Path):
     assert "flow.step1" in html                          # rubric id
     assert "只说了合同生效" in html                      # violation detail
     assert "未问退出" in html                            # skipped rubric reasoning
+
+
+def test_report_rebases_moved_nested_trace_and_finds_task(tmp_path: Path,
+                                                          monkeypatch):
+    root = tmp_path / "checkout"
+    trace = root / "traces" / "run_1" / "demo.jsonl"
+    trace.parent.mkdir(parents=True)
+    _write_synthetic_trace(trace)
+    task_dir = root / "tasks" / "demo"
+    task_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(builder, "_PROJECT_ROOT", root)
+    result = _result("/obsolete/location/traces/run_1/demo.jsonl")
+
+    assert builder._infer_task_dir(result) == task_dir
+    out = build_case_report(result, tmp_path / "rebased.html")
+    assert "你好我是站长" in out.read_text(encoding="utf-8")
 
 
 def test_build_dashboard_multipage(tmp_path: Path):

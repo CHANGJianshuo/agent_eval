@@ -164,12 +164,15 @@ def extract_rubrics(task: TaskDefinition, judge_model: str,
                     max_attempts: int = 3) -> list[Rubric]:
     """调 LLM,返回解析后的 rubric 列表。失败自动重试。"""
     user_prompt = build_prompt(task)
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
     last_err: Exception | None = None
     for attempt in range(max_attempts):
         response = llm_client.chat(
             judge_model,
-            [{"role": "system", "content": _SYSTEM_PROMPT},
-             {"role": "user", "content": user_prompt}],
+            messages,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
             max_tokens=8000,
@@ -178,5 +181,17 @@ def extract_rubrics(task: TaskDefinition, judge_model: str,
             return parse_extractor_output(response)
         except (ValueError, yaml.YAMLError) as exc:
             last_err = exc
+            if attempt < max_attempts - 1:
+                messages.extend([
+                    {"role": "assistant", "content": response},
+                    {
+                        "role": "user",
+                        "content": (
+                            "上面的 YAML 无法通过评分项校验，错误为："
+                            f"{exc}。请只返回修正后的完整 YAML 列表，字段必须符合"
+                            "既定 schema，不要解释。"
+                        ),
+                    },
+                ])
     raise RuntimeError(
         f"rubric 抽取失败（重试 {max_attempts} 次）: {last_err}")

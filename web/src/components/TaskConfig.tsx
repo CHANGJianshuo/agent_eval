@@ -98,11 +98,17 @@ function PromptEditor({ taskId }: { taskId: string }) {
         </div>
       </div>
 
+      {saveMut.isError && (
+        <div className="text-xs text-destructive">
+          保存失败：{(saveMut.error as any)?.response?.data?.detail || '请稍后重试'}
+        </div>
+      )}
+
       {Object.keys(data.variables || {}).length > 0 && (
         <Card className="p-4 mt-3">
           <h3 className="text-sm font-semibold mb-1">业务变量</h3>
           <p className="text-xs text-muted-foreground mb-2">
-            Prompt 中用 {'${变量名}'} 引用的占位符。跑测试时替换为真实值，评分器用白名单校验 SUT 不编造数字。
+            Prompt 中用 {'{变量名}'} 引用占位符（兼容旧的 {'${变量名}'}）。跑测试时替换为真实值，评分器用白名单校验 SUT 不编造数字。
           </p>
           <table className="w-full text-sm">
             <thead>
@@ -137,7 +143,8 @@ function RubricsTable({ taskId }: { taskId: string }) {
   })
   const [edits, setEdits] = useState<Record<number, number>>({})
   const saveMut = useMutation({
-    mutationFn: (rubrics: any[]) => TasksAPI.updateRubrics(taskId, rubrics),
+    mutationFn: (rubrics: any[]) =>
+      TasksAPI.updateRubrics(taskId, rubrics, data?.is_draft ?? false),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task-rubrics', taskId] })
       setEdits({})
@@ -233,6 +240,11 @@ function RubricsTable({ taskId }: { taskId: string }) {
           </>
         )}
       </div>
+      {saveMut.isError && (
+        <div className="text-xs text-destructive text-right">
+          保存失败：{(saveMut.error as any)?.response?.data?.detail || '请检查 Rubric 格式'}
+        </div>
+      )}
     </div>
   )
 }

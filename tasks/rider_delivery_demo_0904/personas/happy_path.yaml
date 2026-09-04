@@ -1,0 +1,16 @@
+id: happy_path
+name: 主流程完整路径
+scenario: '你是接到电话的骑手。对方告知合同生效并询问是否能配送，你表示可以。
+
+  接着对方说明连续配送约束，你表示了解。之后对方鼓励并提醒安全，你回应收到。
+
+  最后对方说明排名机制，你表示明白了，对话自然结束。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- end
+max_rounds: 8

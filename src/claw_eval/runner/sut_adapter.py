@@ -29,3 +29,21 @@ class SUTAdapter:
             chat_messages.append({"role": m.role, "content": m.text})
         return llm_client.chat(self.model, chat_messages, self.temperature,
                                reasoning_effort=self.reasoning_effort)
+
+    def open_call(self) -> str:
+        """外呼接通后由 SUT 主动说第一句话。"""
+        return llm_client.chat(
+            self.model,
+            [
+                {"role": "system", "content": self.system_prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        "（系统事件：外呼电话刚刚接通。）请直接按照 Opening Line "
+                        "说开场白并等待对方回应，只输出你要说的话。"
+                    ),
+                },
+            ],
+            self.temperature,
+            reasoning_effort=self.reasoning_effort,
+        )

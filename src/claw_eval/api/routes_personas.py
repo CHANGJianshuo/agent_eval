@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..dimensions import load_dimensions, save_dimensions
-from ..models.persona import load_personality
+from ..models.persona import PersonaScript, load_personality
 
 
 def _root() -> Path:
@@ -123,20 +123,31 @@ def update_persona_library(body: PersonaLibraryIn):
 def get_task_scripts(task_id: str):
     """该任务下所有剧本(状态机/探针),按场景展示。同时读 personas/ 和 personas_draft/。"""
     td = TASKS_DIR / task_id
-    approved_stems: set[str] = set()
     personas_dir = td / "personas"
-    if personas_dir.exists():
-        approved_stems = {p.stem for p in personas_dir.glob("*.yaml")}
+    draft_dir = td / "personas_draft"
 
-    all_files: list[tuple[Path, bool]] = []  # (path, is_draft)
-    seen: set[str] = set()
-    for subdir, draft in [("personas", False), ("personas_draft", True)]:
-        d = td / subdir
-        if d.exists():
-            for pf in sorted(d.glob("*.yaml")):
-                if pf.stem not in seen:
-                    seen.add(pf.stem)
-                    all_files.append((pf, draft and pf.stem not in approved_stems))
+    def _yaml_equal(left: Path, right: Path) -> bool:
+        try:
+            left_data = yaml.safe_load(left.read_text(encoding="utf-8")) or {}
+            right_data = yaml.safe_load(right.read_text(encoding="utf-8")) or {}
+            return PersonaScript.model_validate(left_data).model_dump() == \
+                PersonaScript.model_validate(right_data).model_dump()
+        except Exception:
+            return False
+
+    # One row per script id. A changed draft overrides its approved baseline so
+    # the reviewer sees the content that will actually be approved.
+    selected: dict[str, tuple[Path, bool]] = {}
+    if personas_dir.exists():
+        for path in sorted(personas_dir.glob("*.yaml")):
+            selected[path.stem] = (path, False)
+    if draft_dir.exists():
+        for path in sorted(draft_dir.glob("*.yaml")):
+            approved = personas_dir / path.name
+            if not approved.exists() or not _yaml_equal(path, approved):
+                selected[path.stem] = (path, True)
+
+    all_files = [selected[key] for key in sorted(selected)]
     if not all_files:
         return {"scripts": []}
 

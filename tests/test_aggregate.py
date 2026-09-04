@@ -121,3 +121,16 @@ def test_aggregate_heatmap_structure():
     # p2 row 只有 a(未提及 b → 不在 row 里)
     assert s.heatmap["p2"]["a"] == 0.7
     assert "b" not in s.heatmap["p2"]
+
+
+def test_aggregate_heatmap_uses_true_mean_for_three_trials():
+    results = [
+        _result("p1", 1.0, True, 1.0, 1.0, 1.0, [
+            _rs("a", "completion", score),
+        ])
+        for score in (1.0, 1.0, 0.0)
+    ]
+
+    summary = aggregate(results)
+
+    assert summary.heatmap["p1"]["a"] == 0.6667

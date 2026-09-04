@@ -17,5 +17,5 @@
   POST /api/config/test-connection      测试 LLM 连接
 
 启动:claw-eval web --port 8000
-Swagger:http://localhost:8000/docs
+Swagger:http://localhost:8000/api/docs
 """

@@ -3,15 +3,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..db import get_run, list_runs
+from ..models.rubric import load_rubrics
+from ..models.task import TaskDefinition
 
 
 def _root() -> Path:
@@ -45,10 +48,10 @@ class TestInfo(BaseModel):
 
 class NewTestRequest(BaseModel):
     test_id: str = ""                    # 留空则自动生成
-    total: int = 30
+    total: int = Field(default=30, ge=1, le=500)
     no_judge: bool = False
-    weights: dict[str, float] = {}       # persona -> weight (legacy)
-    dimensions: dict[str, dict[str, float]] = {}   # 5 维度比例 → persona_factory
+    weights: dict[str, float] = Field(default_factory=dict)  # persona -> weight (legacy)
+    dimensions: dict[str, dict[str, float]] = Field(default_factory=dict)  # 5 维度比例 → persona_factory
     auto_recommend: bool = False
     prompt_version: str | None = None    # 用某历史版本
 
@@ -128,6 +131,7 @@ def get_test(test_id: str):
 
 
 _TEST_JOBS: dict[str, dict] = {}
+_SAFE_TEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 
 
 @router.post("/tasks/{task_id}/tests", response_model=JobStatus)
@@ -137,45 +141,53 @@ def start_test(task_id: str, req: NewTestRequest, background: BackgroundTasks):
         raise HTTPException(404, f"任务 {task_id} 不存在")
 
     td = TASKS_DIR / task_id
-
-    # ── 自动应用草稿(draft → final) ──
-    import shutil
     draft_r = td / "rubrics.draft.yaml"
     final_r = td / "rubrics.yaml"
-    if draft_r.exists():
-        shutil.copy2(draft_r, final_r)
     draft_p = td / "personas_draft"
-    final_p = td / "personas"
-    if draft_p.exists():
-        final_p.mkdir(exist_ok=True)
-        for f in draft_p.glob("*.yaml"):
-            shutil.copy2(f, final_p / f.name)
 
     # ── 配置预检 ──
     errors = []
-    if not (td / "task.yaml").exists():
+    task_file = td / "task.yaml"
+    if not task_file.exists():
         errors.append("缺少 task.yaml（任务 Prompt）")
-    if not final_r.exists():
-        errors.append("缺少评分项（rubrics.yaml 和 rubrics.draft.yaml 都不存在）")
     else:
         try:
-            import yaml
-            with open(final_r, encoding="utf-8") as f:
-                rd = yaml.safe_load(f)
-            if not rd or not rd.get("rubrics"):
+            TaskDefinition.from_yaml(task_file).rendered_prompt()
+        except Exception as exc:
+            errors.append(f"task.yaml 校验失败: {exc}")
+    if not final_r.exists():
+        if draft_r.exists():
+            errors.append("评分项仍是草稿，请先在任务页审核并转正")
+        else:
+            errors.append("缺少评分项（rubrics.yaml 不存在）")
+    else:
+        try:
+            rubrics = load_rubrics(final_r)
+            if not rubrics:
                 errors.append("rubrics.yaml 内容为空")
         except Exception as e:
-            errors.append(f"rubrics.yaml 解析失败: {e}")
+            errors.append(f"rubrics.yaml 校验失败: {e}")
     scripts_dir = td / "personas"
     n_scripts = len(list(scripts_dir.glob("*.yaml"))) if scripts_dir.exists() else 0
     if n_scripts == 0:
-        errors.append("缺少剧本（personas/ 目录为空）")
+        has_drafts = draft_p.exists() and any(draft_p.glob("*.yaml"))
+        if has_drafts:
+            errors.append("模拟用户剧本仍是草稿，请先在任务页审核并转正")
+        else:
+            errors.append("缺少剧本（personas/ 目录为空）")
     if not (td / "grader.py").exists():
         errors.append("缺少评分器（grader.py）")
+    if req.prompt_version is not None:
+        errors.append("prompt_version 尚不支持按次运行，请先切换任务版本后再启动")
     if errors:
         raise HTTPException(422, "配置预检失败:\n" + "\n".join(f"• {e}" for e in errors))
 
     test_id = req.test_id or f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    if not _SAFE_TEST_ID.fullmatch(test_id):
+        raise HTTPException(
+            422,
+            "test_id 只能包含英文字母、数字、下划线和连字符，且必须以字母或数字开头",
+        )
     job_id = f"test_{test_id}"
     _TEST_JOBS[job_id] = {"status": "running", "task_id": task_id,
                           "test_id": test_id, "log": []}
@@ -196,7 +208,10 @@ def start_test(task_id: str, req: NewTestRequest, background: BackgroundTasks):
             env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
             proc = subprocess.run(cmd, capture_output=True, text=True,
                                      env=env, cwd=str(ROOT))
-            _TEST_JOBS[job_id]["log"] = proc.stdout[-3000:]
+            combined_log = "\n".join(
+                part for part in (proc.stdout, proc.stderr) if part
+            )
+            _TEST_JOBS[job_id]["log"] = combined_log[-3000:]
             if proc.returncode != 0:
                 _TEST_JOBS[job_id]["status"] = "failed"
                 return

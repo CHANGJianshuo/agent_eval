@@ -105,6 +105,7 @@ export default function TestDetail() {
             <div className="text-sm font-medium mt-1">
               {test.status === 'running' && <Badge variant="warning">⏳ 跑批中</Badge>}
               {test.status === 'done' && <Badge variant="success">✓ 完成</Badge>}
+              {test.status === 'partial' && <Badge variant="warning">⚠ 部分失败</Badge>}
               {test.status === 'failed' && <Badge variant="danger">✗ 失败</Badge>}
             </div>
           </div>

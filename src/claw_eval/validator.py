@@ -17,6 +17,7 @@ from pathlib import Path
 from .models.persona import Persona, load_persona
 from .models.rubric import Rubric, TriggerSpec, load_rubrics
 from .models.task import TaskDefinition
+from .templating import MissingTemplateVariables, render_template
 from .user_simulator.state_machine import StateMachine
 
 
@@ -70,7 +71,7 @@ def check_rubric_naming(rubrics: list[Rubric]) -> list[Issue]:
             if cat not in _KNOWN_CATEGORIES:
                 out.append(Issue(
                     "info", "naming",
-                    f"rubric '{r.id}' 类别 '{cat}' 非标准 6 类({sorted(_KNOWN_CATEGORIES)})"))
+                    f"rubric '{r.id}' 类别 '{cat}' 非标准 7 类({sorted(_KNOWN_CATEGORIES)})"))
     return out
 
 
@@ -100,6 +101,28 @@ def check_safety_flags(rubrics: list[Rubric]) -> list[Issue]:
     return out
 
 
+def check_template_variables(task: TaskDefinition,
+                             rubrics: list[Rubric]) -> list[Issue]:
+    """Prompt 与 rubric 引用的变量必须存在且不能仍是 TODO。"""
+    out: list[Issue] = []
+    for name, value in task.variables.items():
+        if isinstance(value, str) and value.strip().startswith("<TODO"):
+            out.append(Issue(
+                "error", "variable_todo",
+                f"变量 '{name}' 仍是占位值 {value!r},请填写业务真值"))
+
+    templates = [("task.prompt", task.prompt)]
+    templates.extend((f"rubric '{r.id}'", r.check) for r in rubrics)
+    for source, text in templates:
+        try:
+            render_template(text, task.variables)
+        except MissingTemplateVariables as exc:
+            out.append(Issue(
+                "error", "template_variable_missing",
+                f"{source} 引用了未定义变量: {sorted(exc.names)}"))
+    return out
+
+
 def check_trigger_reachable(rubrics: list[Rubric],
                             personas: list[Persona]) -> list[Issue]:
     """每条带 trigger 的 rubric 至少要有一个 persona 能触发。"""
@@ -118,8 +141,13 @@ def _trigger_reachable(trigger: TriggerSpec, personas: list[Persona]) -> bool:
             if any(pr.id == trigger.probe_id for pr in p.probes):
                 return True
         elif trigger.type == "user_state":
-            if (trigger.state in p.states
-                    or trigger.state in set(p.transitions.values())):
+            targets: set[str] = set()
+            for spec in p.transitions.values():
+                if isinstance(spec, str):
+                    targets.add(spec)
+                elif isinstance(spec, dict):
+                    targets.update(spec)
+            if trigger.state in p.states or trigger.state in targets:
                 return True
         elif trigger.type == "user_keyword":
             # 简化:只在 probe 文本里查关键词;LLM 生成的话术里偶尔出现不算
@@ -240,6 +268,7 @@ def validate_task(task_dir: str | Path,
     rep.issues += check_rubric_naming(rubrics)
     rep.issues += check_weights(rubrics)
     rep.issues += check_safety_flags(rubrics)
+    rep.issues += check_template_variables(task, rubrics)
     rep.issues += check_trigger_reachable(rubrics, personas)
     rep.issues += check_state_termination(personas)
 

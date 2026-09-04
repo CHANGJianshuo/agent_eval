@@ -8,14 +8,19 @@ from . import MatcherResult
 
 _DEFAULT_PATTERNS = [
     r"\$\{[^}]*\}",                        # ${rider_name}
+    r"(?<!\$)\{[A-Za-z_][A-Za-z0-9_]*\}", # {rider_name}
     r"(?<![A-Za-z])[XYZW](?=\s*[单天点])",  # 字面 X单 / Y天 / Z点
 ]
 
 
 def check_placeholder(messages: list[TraceMessage],
-                      patterns: list[str] | None = None, **_) -> MatcherResult:
+                      patterns: list[str] | None = None,
+                      pattern: str | None = None, **_) -> MatcherResult:
     """扫描 assistant 输出。有任何残留 → score 0,否则 1。"""
-    regexes = [re.compile(p) for p in (patterns or _DEFAULT_PATTERNS)]
+    configured = patterns if patterns is not None else (
+        [pattern] if pattern else _DEFAULT_PATTERNS
+    )
+    regexes = [re.compile(p) for p in configured]
     violations: list[Violation] = []
 
     for m in (x for x in messages if x.role == "assistant"):

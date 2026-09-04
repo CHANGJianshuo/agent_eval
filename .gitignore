@@ -25,3 +25,8 @@ reports/
 web/node_modules/
 web/dist/
 web/.vite/
+
+# Demo recordings and rendered media (reproducible via demo/record_demo.py)
+demo/build/
+demo/raw/
+demo/*.mp4

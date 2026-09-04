@@ -81,7 +81,7 @@ def test_parse_variables_empty_returns_empty():
 
 
 def test_auto_detect_placeholders():
-    prompt = "你好 {rider_name},今天 {X} 单,完成 {Y} 天"
+    prompt = "你好 ${rider_name},今天 {X} 单,完成 {Y} 天"
     s = auto_detect_placeholders(prompt)
     assert s == {"rider_name", "X", "Y"}
 

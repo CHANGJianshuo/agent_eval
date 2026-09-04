@@ -1,0 +1,67 @@
+[
+  {
+    "item_id": "demo_eval_0904/rider_delivery_demo_0904_gen_t3_cooperative_unspecified_female_unspecified_t3#behavior.hang_up_after_comfort",
+    "task_id": "rider_delivery_demo_0904",
+    "run_id": "demo_eval_0904",
+    "trace_path": "traces/demo_eval_0904/rider_delivery_demo_0904_gen_t3_cooperative_unspecified_female_unspecified_t3.jsonl",
+    "persona_id": "gen_t3_cooperative_unspecified_female_unspecified",
+    "script_id": "ask_out_of_scope",
+    "rubric_id": "behavior.hang_up_after_comfort",
+    "dimension": "robustness",
+    "judge_score": 1.0,
+    "judge_reasoning": "通话中骑手明确表示可以配送并同意要求，未触发“骑手坚持无法配送”的条件，站长无需安慰后挂断，故不扣分。",
+    "evidence_turn": 3
+  },
+  {
+    "item_id": "demo_eval_0904/rider_delivery_demo_0904_gen_t4_cooperative_unspecified_female_unspecified_t4#behavior.out_of_scope",
+    "task_id": "rider_delivery_demo_0904",
+    "run_id": "demo_eval_0904",
+    "trace_path": "traces/demo_eval_0904/rider_delivery_demo_0904_gen_t4_cooperative_unspecified_female_unspecified_t4.jsonl",
+    "persona_id": "gen_t4_cooperative_unspecified_female_unspecified",
+    "script_id": "ask_slots_rule_midway",
+    "rubric_id": "behavior.out_of_scope",
+    "dimension": "robustness",
+    "judge_score": 0.0,
+    "judge_reasoning": "骑手在第3轮询问名额是否会被顶掉，站长直接回答，未按标准回复“我向同事确认后再回电给你”。",
+    "evidence_turn": 3
+  },
+  {
+    "item_id": "demo_eval_0904/rider_delivery_demo_0904_gen_t2_cooperative_unspecified_female_unspecified_t2#constraint.no_repeat",
+    "task_id": "rider_delivery_demo_0904",
+    "run_id": "demo_eval_0904",
+    "trace_path": "traces/demo_eval_0904/rider_delivery_demo_0904_gen_t2_cooperative_unspecified_female_unspecified_t2.jsonl",
+    "persona_id": "gen_t2_cooperative_unspecified_female_unspecified",
+    "script_id": "ask_exit_rule_midway",
+    "rubric_id": "constraint.no_repeat",
+    "dimension": "robustness",
+    "judge_score": 0.4,
+    "judge_reasoning": "站长在第8轮和第14轮重复提醒“单日20单”任务，且第14轮未有效换种方式表达，存在重复回复。",
+    "evidence_turn": 14
+  },
+  {
+    "item_id": "demo_eval_v2_0904/rider_delivery_demo_0904_gen_t5_cooperative_unspecified_female_unspecified_t5#constraint.one_info_per_turn",
+    "task_id": "rider_delivery_demo_0904",
+    "run_id": "demo_eval_v2_0904",
+    "trace_path": "traces/demo_eval_v2_0904/rider_delivery_demo_0904_gen_t5_cooperative_unspecified_female_unspecified_t5.jsonl",
+    "persona_id": "gen_t5_cooperative_unspecified_female_unspecified",
+    "script_id": "happy_path",
+    "rubric_id": "constraint.one_info_per_turn",
+    "dimension": "completion",
+    "judge_score": 0.0,
+    "judge_reasoning": "第1轮站长在同一条消息中同时说明了飞毛腿生效、上线时段、单量与配送要求等多个信息点，明显合并了多个流程步骤或FAQ。",
+    "evidence_turn": 1
+  },
+  {
+    "item_id": "demo_eval_v2_0904/rider_delivery_demo_0904_gen_t5_cooperative_unspecified_female_unspecified_t5#faq.bonus_reward",
+    "task_id": "rider_delivery_demo_0904",
+    "run_id": "demo_eval_v2_0904",
+    "trace_path": "traces/demo_eval_v2_0904/rider_delivery_demo_0904_gen_t5_cooperative_unspecified_female_unspecified_t5.jsonl",
+    "persona_id": "gen_t5_cooperative_unspecified_female_unspecified",
+    "script_id": "happy_path",
+    "rubric_id": "faq.bonus_reward",
+    "dimension": "completion",
+    "judge_score": 0.0,
+    "judge_reasoning": "站长未在骑手询问奖励时说明完成3天多日合同且每天15单每单多2元，仅第3轮提及连续3天每天15单，缺少每单多2元的奖励说明。",
+    "evidence_turn": 3
+  }
+]

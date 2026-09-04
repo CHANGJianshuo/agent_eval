@@ -12,11 +12,13 @@ from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..db import list_runs
-from ..models.rubric import load_rubrics
+from ..models.persona import PersonaScript
+from ..models.rubric import Rubric, load_rubrics, save_rubrics
 from ..task_gen.versioning import list_versions
+from ..user_simulator.extractor import save_script
 
 
 def _root() -> Path:
@@ -57,7 +59,11 @@ class TaskDetail(TaskListItem):
 
 
 class NewTaskRequest(BaseModel):
-    task_id: str
+    task_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    )
     description: str = ""
     prompt: str
 
@@ -106,6 +112,23 @@ def _task_brief(task: str) -> str:
     return ""
 
 
+def _rubrics_equivalent(left: Path, right: Path) -> bool:
+    """Compare rule semantics while ignoring review-only metadata."""
+    try:
+        def _comparable(path: Path) -> list[dict]:
+            rows = []
+            for rubric in load_rubrics(path):
+                row = rubric.model_dump(exclude_none=True)
+                row.pop("reviewed", None)
+                row.pop("confidence", None)
+                rows.append(row)
+            return rows
+
+        return _comparable(left) == _comparable(right)
+    except Exception:
+        return False
+
+
 def _milestones(task: str) -> dict[str, bool]:
     td = TASKS_DIR / task
     m1 = (td / "rubrics.yaml").exists() and (td / "grader.py").exists()
@@ -141,9 +164,9 @@ def _resolve_api_key() -> str | None:
     if keys_file.exists():
         try:
             keys = yaml.safe_load(keys_file.read_text(encoding="utf-8")) or {}
-            for prov in ["deepseek", "xiaomi_mimo", "openai", "anthropic"]:
-                if keys.get(prov):
-                    return str(keys[prov])
+            provider = env_var.removesuffix("_API_KEY").lower()
+            if keys.get(provider):
+                return str(keys[provider])
         except Exception:
             pass
     return None
@@ -340,6 +363,24 @@ def extract_task_meta(req: ExtractMetaReq):
     if len(req.prompt.strip()) < 20:
         raise HTTPException(400, "prompt 太短")
 
+    # 允许调用方在 Prompt 中显式提供稳定标识。除了让重复演示更可控，
+    # 也避免仅因一次元数据模型输出格式异常而阻断整个任务创建流程。
+    explicit_id = re.search(
+        r"(?im)^\s*(?:[#>*-]+\s*)?(?:demo\s+)?task[ _-]?id\s*[:：]?\s*`?"
+        r"([a-z][a-z0-9_]*)`?\s*$",
+        req.prompt,
+    )
+    if explicit_id:
+        explicit_desc = re.search(
+            r"(?im)^\s*(?:[#>*-]+\s*)?description\s*[:：]\s*(.{1,40})$",
+            req.prompt,
+        )
+        description = explicit_desc.group(1).strip()[:20] if explicit_desc else ""
+        return {
+            "task_id": explicit_id.group(1).lower()[:64].rstrip("_"),
+            "description": description,
+        }
+
     api_key = _resolve_api_key()
     if not api_key:
         raise HTTPException(400, "未配置 API Key，请先在设置页面添加")
@@ -375,10 +416,14 @@ def extract_task_meta(req: ExtractMetaReq):
             api_key=api_key,
         )
         cleaned = re.sub(r"```json\s*|```", "", raw).strip()
-        result = json.loads(cleaned)
-        task_id = str(result.get("task_id", "new_task")).strip()
-        task_id = re.sub(r"[\/\\<>:\"|?*\s]+", "_", task_id)
+        json_match = re.search(r"\{[\s\S]*\}", cleaned)
+        result = json.loads(json_match.group(0) if json_match else cleaned)
+        task_id = str(result.get("task_id", "new_task")).strip().lower()
+        task_id = re.sub(r"[^a-z0-9_]+", "_", task_id)
         task_id = re.sub(r"_+", "_", task_id).strip("_") or "new_task"
+        if not task_id[0].isalpha():
+            task_id = f"task_{task_id}"
+        task_id = task_id[:64].rstrip("_")
         description = str(result.get("description", ""))
         return {"task_id": task_id, "description": description}
     except Exception as exc:
@@ -430,13 +475,14 @@ def update_task_prompt(task_id: str, req: UpdatePromptReq):
 
 @router.get("/tasks/{task_id}/rubrics")
 def get_task_rubrics(task_id: str):
-    """读 rubrics.yaml(若不存在,试 rubrics.draft.yaml)。"""
+    """读待审草稿；没有待审修改时读已生效 rubrics.yaml。"""
     td = TASKS_DIR / task_id
-    rb = td / "rubrics.yaml"
-    is_draft = False
-    if not rb.exists():
-        rb = td / "rubrics.draft.yaml"
-        is_draft = True
+    final = td / "rubrics.yaml"
+    draft = td / "rubrics.draft.yaml"
+    is_draft = draft.exists() and (
+        not final.exists() or not _rubrics_equivalent(draft, final)
+    )
+    rb = draft if is_draft else final
     if not rb.exists():
         return {"rubrics": [], "is_draft": False}
     try:
@@ -451,6 +497,7 @@ def get_task_rubrics(task_id: str):
 
 class UpdateRubricsReq(BaseModel):
     rubrics: list[dict]
+    is_draft: bool = False
 
 
 @router.put("/tasks/{task_id}/rubrics")
@@ -459,14 +506,20 @@ def update_rubrics(task_id: str, req: UpdateRubricsReq):
     td = TASKS_DIR / task_id
     if not td.exists():
         raise HTTPException(404)
-    rb = td / "rubrics.yaml"
-    if not rb.exists():
-        rb = td / "rubrics.draft.yaml"
-    rb.write_text(
-        yaml.safe_dump(req.rubrics, allow_unicode=True, sort_keys=False,
-                       default_flow_style=False),
-        encoding="utf-8")
-    return {"ok": True, "count": len(req.rubrics)}
+    try:
+        rubrics = [Rubric.model_validate(row) for row in req.rubrics]
+    except Exception as exc:
+        raise HTTPException(422, f"Rubric 校验失败: {exc}") from exc
+    if not rubrics:
+        raise HTTPException(422, "Rubric 列表不能为空")
+
+    final = td / "rubrics.yaml"
+    # Editing a generated-only task must not create an approved file. For an
+    # established task, the caller explicitly tells us whether it is editing
+    # the pending draft or the active rule set.
+    rb = td / "rubrics.draft.yaml" if req.is_draft or not final.exists() else final
+    save_rubrics(rubrics, rb, include_meta=True)
+    return {"ok": True, "count": len(rubrics), "file": rb.name}
 
 
 @router.get("/tasks/{task_id}/flow")
@@ -496,16 +549,45 @@ def get_task_versions(task_id: str):
 def get_review_status(task_id: str):
     """审核状态:哪些还是草稿,哪些已转正。"""
     td = TASKS_DIR / task_id
+    if not td.exists():
+        raise HTTPException(404, f"task {task_id} 不存在")
     has_rubrics = (td / "rubrics.yaml").exists()
     has_draft_rubrics = (td / "rubrics.draft.yaml").exists()
+
+    rubrics_pending = False
+    if has_draft_rubrics:
+        if not has_rubrics:
+            rubrics_pending = True
+        else:
+            rubrics_pending = not _rubrics_equivalent(
+                td / "rubrics.draft.yaml", td / "rubrics.yaml"
+            )
+
     personas_dir = td / "personas"
     draft_dir = td / "personas_draft"
     approved = sorted(p.stem for p in personas_dir.glob("*.yaml")) if personas_dir.exists() else []
     drafts = sorted(p.stem for p in draft_dir.glob("*.yaml")) if draft_dir.exists() else []
-    pending = [d for d in drafts if d not in approved]
+
+    def _same_yaml(left: Path, right: Path) -> bool:
+        try:
+            left_data = yaml.safe_load(left.read_text(encoding="utf-8")) or {}
+            right_data = yaml.safe_load(right.read_text(encoding="utf-8")) or {}
+            return PersonaScript.model_validate(left_data).model_dump() == \
+                PersonaScript.model_validate(right_data).model_dump()
+        except Exception:
+            return False
+
+    pending = [
+        pid for pid in drafts
+        if not (personas_dir / f"{pid}.yaml").exists()
+        or not _same_yaml(
+            draft_dir / f"{pid}.yaml",
+            personas_dir / f"{pid}.yaml",
+        )
+    ]
     return {
         "rubrics_approved": has_rubrics,
-        "rubrics_draft": has_draft_rubrics and not has_rubrics,
+        "rubrics_draft": rubrics_pending,
         "personas_approved": approved,
         "personas_pending": pending,
     }
@@ -513,7 +595,7 @@ def get_review_status(task_id: str):
 
 class ApproveReq(BaseModel):
     approve_rubrics: bool = False
-    approve_personas: list[str] = []
+    approve_personas: list[str] = Field(default_factory=list)
 
 
 @router.post("/tasks/{task_id}/approve")
@@ -524,25 +606,63 @@ def approve_drafts(task_id: str, req: ApproveReq):
         raise HTTPException(404)
 
     results: list[str] = []
+    staged_rubrics: list[Rubric] | None = None
 
     if req.approve_rubrics:
         draft = td / "rubrics.draft.yaml"
-        final = td / "rubrics.yaml"
         if draft.exists():
-            shutil.copy2(draft, final)
-            results.append(f"rubrics 已转正（{sum(1 for _ in open(final))} 行）")
+            try:
+                staged_rubrics = [
+                    rubric.model_copy(update={
+                        "reviewed": True,
+                        "confidence": None,
+                    })
+                    for rubric in load_rubrics(draft)
+                ]
+            except Exception as exc:
+                raise HTTPException(
+                    422, f"Rubric 草稿校验失败，未转正: {exc}"
+                ) from exc
+            if not staged_rubrics:
+                raise HTTPException(422, "Rubric 草稿为空，未转正")
         else:
             results.append("无 rubrics 草稿")
 
     personas_dir = td / "personas"
     draft_dir = td / "personas_draft"
-    personas_dir.mkdir(exist_ok=True)
+    available = {
+        path.stem: path for path in draft_dir.glob("*.yaml")
+    } if draft_dir.exists() else {}
+    unknown = sorted(set(req.approve_personas) - set(available))
+    if unknown:
+        raise HTTPException(422, f"不存在的 persona 草稿: {unknown}")
+
+    staged_personas: dict[str, PersonaScript] = {}
     for pid in req.approve_personas:
-        src = draft_dir / f"{pid}.yaml"
-        dst = personas_dir / f"{pid}.yaml"
-        if src.exists():
-            shutil.copy2(src, dst)
-            results.append(f"persona {pid} 已转正")
+        src = available[pid]
+        try:
+            data = yaml.safe_load(src.read_text(encoding="utf-8")) or {}
+            script = PersonaScript.model_validate(data)
+        except Exception as exc:
+            raise HTTPException(
+                422, f"Persona 草稿 {pid} 校验失败，未转正: {exc}"
+            ) from exc
+        if script.id != pid:
+            raise HTTPException(
+                422, f"Persona 草稿文件名 {pid!r} 与 id {script.id!r} 不一致"
+            )
+        staged_personas[pid] = script
+
+    # Commit only after every selected file has passed validation, avoiding a
+    # half-approved task when one later persona is malformed.
+    if staged_rubrics is not None:
+        save_rubrics(staged_rubrics, td / "rubrics.yaml", include_meta=True)
+        results.append(f"rubrics 已转正（{len(staged_rubrics)} 条）")
+    if staged_personas:
+        personas_dir.mkdir(exist_ok=True)
+    for pid, script in staged_personas.items():
+        save_script(script, personas_dir / f"{pid}.yaml")
+        results.append(f"persona {pid} 已转正")
 
     return {"ok": True, "results": results}
 
@@ -563,7 +683,6 @@ _AGENT_SYSTEM = """\
 你可以修改的内容:
 - rubrics: 修改 weight、check、删除、新增评分项
 - scripts: 修改场景描述、探针、覆盖节点
-- flow: 修改节点、边
 
 当前任务的配置会作为上下文提供给你。
 
@@ -602,9 +721,15 @@ def agent_chat(task_id: str, req: AgentChatReq):
     context_parts = []
 
     # rubrics
-    rb = td / "rubrics.yaml"
-    if not rb.exists():
-        rb = td / "rubrics.draft.yaml"
+    final_rb = td / "rubrics.yaml"
+    draft_rb = td / "rubrics.draft.yaml"
+    rb = (
+        draft_rb
+        if draft_rb.exists() and (
+            not final_rb.exists() or not _rubrics_equivalent(draft_rb, final_rb)
+        )
+        else final_rb
+    )
     if rb.exists():
         try:
             rubrics = load_rubrics(rb)
@@ -681,75 +806,133 @@ def agent_chat(task_id: str, req: AgentChatReq):
     if not actions:
         return {"reply": reply, "applied": False}
 
-    # 执行操作
+    # 执行操作。AI 修改一律写草稿，只有 /approve 能转为正式配置。
     applied_count = 0
-
-    # 加载 rubrics 用于修改
-    rubrics_file = td / "rubrics.yaml"
-    if not rubrics_file.exists():
-        rubrics_file = td / "rubrics.draft.yaml"
-    rubrics_list = []
-    if rubrics_file.exists():
+    rubrics_changed = False
+    rubrics_source = draft_rb if draft_rb.exists() else final_rb
+    rubrics_list: list[dict] = []
+    if rubrics_source.exists():
         try:
-            rubrics_list = yaml.safe_load(
-                rubrics_file.read_text(encoding="utf-8")) or []
-        except Exception:
-            rubrics_list = []
+            rubrics_list = [
+                rubric.model_dump(exclude_none=True)
+                for rubric in load_rubrics(rubrics_source)
+            ]
+        except Exception as exc:
+            return {
+                "reply": f"当前 Rubric 无法读取，未应用修改: {exc}",
+                "applied": False,
+            }
 
-    for act in actions:
-        t = act.get("type", "")
-        if t == "update_rubric":
-            rid = act.get("rubric_id", "")
-            field = act.get("field", "")
-            value = act.get("value")
-            for r in rubrics_list:
-                if isinstance(r, dict) and r.get("id") == rid and field:
-                    r[field] = value
-                    applied_count += 1
-        elif t == "delete_rubric":
-            rid = act.get("rubric_id", "")
-            before = len(rubrics_list)
-            rubrics_list = [r for r in rubrics_list
-                           if not (isinstance(r, dict) and r.get("id") == rid)]
-            if len(rubrics_list) < before:
-                applied_count += 1
-        elif t == "add_rubric":
-            new_r = act.get("rubric", {})
-            if new_r.get("id"):
-                rubrics_list.append(new_r)
-                applied_count += 1
-        elif t in ("update_script", "add_probe", "delete_probe"):
-            sid = act.get("script_id", "")
-            for d in [td / "personas_draft", td / "personas"]:
-                sf = d / f"{sid}.yaml"
-                if sf.exists():
-                    try:
-                        sd = yaml.safe_load(
-                            sf.read_text(encoding="utf-8")) or {}
-                        if t == "update_script":
-                            sd[act.get("field", "")] = act.get("value")
-                        elif t == "add_probe":
-                            sd.setdefault("probes", []).append(act["probe"])
-                        elif t == "delete_probe":
-                            pid = act.get("probe_id", "")
-                            sd["probes"] = [p for p in sd.get("probes", [])
-                                           if p.get("id") != pid]
-                        sf.write_text(
-                            yaml.safe_dump(sd, allow_unicode=True,
-                                          sort_keys=False),
-                            encoding="utf-8")
+    script_sources: dict[str, Path] = {}
+    # 已批准版本作为基线；已有草稿覆盖它，以便连续修改同一份草稿。
+    for directory in [td / "personas", td / "personas_draft"]:
+        if directory.exists():
+            for path in directory.glob("*.yaml"):
+                script_sources[path.stem] = path
+    staged_scripts: dict[str, PersonaScript] = {}
+    allowed_rubric_fields = {
+        "dimension", "method", "check", "weight", "trigger",
+        "is_safety", "params", "category",
+    }
+    allowed_script_fields = {
+        "name", "scenario", "covers_flow_nodes", "max_rounds", "noise",
+        "personality", "states", "initial_state", "transitions",
+    }
+
+    try:
+        for act in actions:
+            if not isinstance(act, dict):
+                continue
+            action_type = act.get("type", "")
+            if action_type == "update_rubric":
+                rid = str(act.get("rubric_id", ""))
+                field_name = str(act.get("field", ""))
+                if field_name not in allowed_rubric_fields:
+                    continue
+                for row in rubrics_list:
+                    if row.get("id") == rid:
+                        row[field_name] = act.get("value")
+                        row["reviewed"] = False
                         applied_count += 1
-                    except Exception:
-                        pass
+                        rubrics_changed = True
+                        break
+            elif action_type == "delete_rubric":
+                rid = str(act.get("rubric_id", ""))
+                before = len(rubrics_list)
+                rubrics_list = [row for row in rubrics_list if row.get("id") != rid]
+                if len(rubrics_list) < before:
+                    applied_count += 1
+                    rubrics_changed = True
+            elif action_type == "add_rubric":
+                new_row = act.get("rubric")
+                if isinstance(new_row, dict) and new_row.get("id"):
+                    if any(row.get("id") == new_row["id"] for row in rubrics_list):
+                        raise ValueError(f"Rubric id 已存在: {new_row['id']}")
+                    rubrics_list.append({**new_row, "reviewed": False})
+                    applied_count += 1
+                    rubrics_changed = True
+            elif action_type in ("update_script", "add_probe", "delete_probe"):
+                sid = str(act.get("script_id", ""))
+                source = script_sources.get(sid)
+                if not source:
+                    continue
+                if sid in staged_scripts:
+                    script_data = staged_scripts[sid].model_dump(exclude_none=True)
+                else:
+                    script_data = yaml.safe_load(
+                        source.read_text(encoding="utf-8")
+                    ) or {}
 
-    # 写回 rubrics
-    if any(a.get("type", "").endswith("rubric") for a in actions):
-        rubrics_file.write_text(
-            yaml.safe_dump(rubrics_list, allow_unicode=True,
-                          sort_keys=False),
-            encoding="utf-8")
+                if action_type == "update_script":
+                    field_name = str(act.get("field", ""))
+                    if field_name not in allowed_script_fields:
+                        continue
+                    script_data[field_name] = act.get("value")
+                elif action_type == "add_probe":
+                    probe = act.get("probe")
+                    if not isinstance(probe, dict):
+                        continue
+                    script_data.setdefault("probes", []).append(probe)
+                else:
+                    probe_id = str(act.get("probe_id", ""))
+                    old_probes = script_data.get("probes", [])
+                    new_probes = [p for p in old_probes if p.get("id") != probe_id]
+                    if len(new_probes) == len(old_probes):
+                        continue
+                    script_data["probes"] = new_probes
+
+                script = PersonaScript.model_validate(script_data)
+                if script.id != sid:
+                    raise ValueError(
+                        f"Persona 文件名 {sid!r} 与 id {script.id!r} 不一致"
+                    )
+                staged_scripts[sid] = script
+                applied_count += 1
+
+        validated_rubrics = (
+            [Rubric.model_validate(row) for row in rubrics_list]
+            if rubrics_changed else []
+        )
+        if rubrics_changed and not validated_rubrics:
+            raise ValueError("不能删除全部 Rubric")
+    except Exception as exc:
+        return {
+            "reply": f"修改未通过配置校验，未写入文件: {exc}",
+            "applied": False,
+        }
+
+    if rubrics_changed:
+        save_rubrics(validated_rubrics, draft_rb, include_meta=True)
+    if staged_scripts:
+        draft_dir = td / "personas_draft"
+        draft_dir.mkdir(exist_ok=True)
+        for sid, script in staged_scripts.items():
+            save_script(script, draft_dir / f"{sid}.yaml")
 
     return {
-        "reply": reply + (f"\n\n(已应用 {applied_count} 项修改)" if applied_count else ""),
+        "reply": reply + (
+            f"\n\n(已写入 {applied_count} 项草稿修改，请审核后转正)"
+            if applied_count else ""
+        ),
         "applied": applied_count > 0,
     }

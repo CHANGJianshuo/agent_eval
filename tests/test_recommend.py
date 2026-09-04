@@ -154,7 +154,7 @@ def test_build_recommendations_no_judge_skips_llm(monkeypatch):
     for _ in range(5)]
     # 多个 result 让 n >= 3 触发
     task = TaskDefinition(task_id="t", prompt="P")
-    rubric = Rubric(id="flow.x", dimension="completion", method="m",
+    rubric = Rubric(id="flow.x", dimension="completion", method="llm_judge",
                      weight=0.1, check="c")
     recs = build_recommendations(task, results, [rubric],
                                   judge_model=None, top_n=5)
@@ -183,7 +183,7 @@ def test_build_recommendations_with_judge_calls_llm(monkeypatch):
     ], [Violation(rubric_id="flow.x", turn=1, detail="", evidence="e")])
     for _ in range(5)]
     task = TaskDefinition(task_id="t", prompt="P")
-    rubric = Rubric(id="flow.x", dimension="completion", method="m",
+    rubric = Rubric(id="flow.x", dimension="completion", method="llm_judge",
                      weight=0.1, check="c")
     recs = build_recommendations(task, results, [rubric],
                                   judge_model="fake-model", top_n=5)

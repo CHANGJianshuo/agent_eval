@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Plus, ArrowRight } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Plus, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react'
 
 import { TasksAPI, TestsAPI } from '@/lib/api'
 import { JobStore } from '@/lib/jobs'
@@ -9,16 +9,22 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { MilestoneProgress } from '@/components/ui/Progress'
-import { NewTestForm } from '@/components/NewTestForm'
 import { TaskConfig } from '@/components/TaskConfig'
 import { ScriptList } from '@/components/ScriptList'
 import { FlowGraph } from '@/components/FlowGraph'
 import { AgentChatToggle } from '@/components/AgentChat'
 
 
+const NewTestForm = lazy(() =>
+  import('@/components/NewTestForm').then(module => ({
+    default: module.NewTestForm,
+  })),
+)
+
 export default function TaskOverview() {
   const { taskId = '' } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const [showNew, setShowNew] = useState(false)
 
   const { data: task } = useQuery({
@@ -32,6 +38,31 @@ export default function TaskOverview() {
     enabled: !!taskId,
     refetchInterval: false,
   })
+  const { data: review } = useQuery({
+    queryKey: ['review-status', taskId],
+    queryFn: () => TasksAPI.reviewStatus(taskId),
+    enabled: !!taskId,
+  })
+  const approveMut = useMutation({
+    mutationFn: () => TasksAPI.approve(
+      taskId,
+      review?.rubrics_draft ?? false,
+      review?.personas_pending ?? [],
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['review-status', taskId] })
+      qc.invalidateQueries({ queryKey: ['task-rubrics', taskId] })
+      qc.invalidateQueries({ queryKey: ['scripts', taskId] })
+      qc.invalidateQueries({ queryKey: ['task', taskId] })
+    },
+  })
+
+  const hasPendingReview = Boolean(
+    review?.rubrics_draft || review?.personas_pending.length,
+  )
+  const canStartTest = Boolean(
+    review?.rubrics_approved && review.personas_approved.length > 0,
+  )
 
   return (
     <div className="space-y-6">
@@ -69,27 +100,78 @@ export default function TaskOverview() {
         </div>
       )}
 
+      {hasPendingReview && review && (
+        <Card className="p-4 border-warning/40 bg-warning/5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold">有配置草稿等待人工审核</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {review.rubrics_draft ? 'Rubrics 待审核' : 'Rubrics 已生效'}
+                {' · '}
+                {review.personas_pending.length > 0
+                  ? `${review.personas_pending.length} 个剧本待审核：${review.personas_pending.join('、')}`
+                  : '剧本均已生效'}
+              </div>
+              {approveMut.isError && (
+                <div className="text-xs text-destructive mt-1">
+                  审核失败：{(approveMut.error as any)?.response?.data?.detail || '请检查配置格式'}
+                </div>
+              )}
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={approveMut.isPending}
+              onClick={() => {
+                if (window.confirm('确认已检查这些 Rubrics 和剧本，并将其设为正式配置？')) {
+                  approveMut.mutate()
+                }
+              }}
+            >
+              {approveMut.isPending
+                ? <Loader2 size={13} className="animate-spin" />
+                : <CheckCircle2 size={13} />}
+              确认已审核并转正
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {review && !canStartTest && !hasPendingReview && (
+        <Card className="p-4 border-destructive/30 bg-destructive/5 text-sm">
+          当前缺少正式 Rubrics 或正式剧本，补齐配置后才能启动测试。
+        </Card>
+      )}
+
       {/* 新建测试表单 / 测试历史 */}
       {showNew ? (
         <Card className="p-5">
-          <NewTestForm
-            taskId={taskId}
-            onCancel={() => setShowNew(false)}
-            onStarted={(jobId, testId) => {
-              JobStore.add({
-                jobId, type: 'test', taskId,
-                description: `测试 ${testId}`,
-                startedAt: Date.now(),
-              })
-              navigate(`/tests/${testId}`)
-            }}
-          />
+          <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">加载测试配置…</div>}>
+            <NewTestForm
+              taskId={taskId}
+              onCancel={() => setShowNew(false)}
+              onStarted={(jobId, testId) => {
+                JobStore.add({
+                  jobId, type: 'test', taskId,
+                  description: `测试 ${testId}`,
+                  startedAt: Date.now(),
+                })
+                navigate(`/tests/${testId}`)
+              }}
+            />
+          </Suspense>
         </Card>
       ) : (
         <>
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">测试历史</h2>
-            <Button variant="primary" size="md" onClick={() => setShowNew(true)}>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!review || !canStartTest}
+              onClick={() => setShowNew(true)}
+              title={!canStartTest ? '请先审核并转正 Rubrics 和至少一个剧本' : undefined}
+            >
               <Plus size={14} /> 新建测试
             </Button>
           </div>
@@ -100,7 +182,12 @@ export default function TaskOverview() {
                 <div className="text-sm text-muted-foreground mb-3">
                   还没有测试。
                 </div>
-                <Button variant="primary" onClick={() => setShowNew(true)}>
+                <Button
+                  variant="primary"
+                  disabled={!review || !canStartTest}
+                  onClick={() => setShowNew(true)}
+                  title={!canStartTest ? '请先审核并转正 Rubrics 和至少一个剧本' : undefined}
+                >
                   <Plus size={14} /> 新建第一个测试
                 </Button>
               </div>
@@ -178,6 +265,7 @@ function TestRow({ test }: { test: any }) {
   const statusBadge = {
     'running': <Badge variant="warning">⏳ 跑批中</Badge>,
     'done':    <Badge variant="success">✓ 完成</Badge>,
+    'partial': <Badge variant="warning">⚠ 部分失败</Badge>,
     'failed':  <Badge variant="danger">✗ 失败</Badge>,
   }[test.status as string] ?? <Badge>{test.status}</Badge>
 

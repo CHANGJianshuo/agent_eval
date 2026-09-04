@@ -3,13 +3,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from claw_eval.models.persona import Persona, ProbeConfig
 from claw_eval.models.rubric import Rubric, TriggerSpec
+from claw_eval.models.task import TaskDefinition
 from claw_eval.validator import (
     check_rubric_naming,
     check_safety_flags,
     check_sampling,
     check_state_termination,
+    check_template_variables,
     check_trigger_reachable,
     check_weights,
     validate_task,
@@ -100,6 +105,54 @@ def test_trigger_reachable_via_user_state():
     persona = _p("p", transitions={"接听": "坚持拒绝", "坚持拒绝": "END"})
     rubric = _r("a.x", trigger=TriggerSpec(type="user_state", state="坚持拒绝"))
     assert not check_trigger_reachable([rubric], [persona])
+
+
+def test_trigger_reachable_via_probability_transition_target():
+    persona = _p(
+        "p",
+        states={"接听": "...", "坚持拒绝": "..."},
+        transitions={
+            "接听": {"坚持拒绝": 0.8, "END": 0.2},
+            "坚持拒绝": "END",
+        },
+    )
+    rubric = _r(
+        "behavior.refusal",
+        trigger=TriggerSpec(type="user_state", state="坚持拒绝"),
+    )
+
+    assert not check_trigger_reachable([rubric], [persona])
+
+
+def test_trigger_schema_rejects_unknown_type_and_missing_payload():
+    with pytest.raises(ValidationError):
+        TriggerSpec(type="user_intent")
+    with pytest.raises(ValidationError):
+        TriggerSpec(type="probe")
+
+
+def test_rubric_schema_rejects_unknown_method():
+    with pytest.raises(ValidationError):
+        Rubric(
+            id="flow.x",
+            dimension="completion",
+            method="silent_zero",
+            check="x",
+            weight=0.1,
+        )
+
+
+def test_template_check_reports_missing_and_todo_variables():
+    task = TaskDefinition(
+        task_id="t",
+        prompt="你好 {name}，完成 {missing} 单",
+        variables={"name": "<TODO name>"},
+    )
+
+    issues = check_template_variables(task, [_r("flow.x")])
+
+    assert any(issue.code == "variable_todo" for issue in issues)
+    assert any(issue.code == "template_variable_missing" for issue in issues)
 
 
 def test_state_termination_ok():

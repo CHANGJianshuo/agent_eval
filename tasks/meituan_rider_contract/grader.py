@@ -81,4 +81,4 @@ class MeituanRiderContractGrader(AbstractGrader):
         if trigger.type == "user_keyword":
             user_text = "\n".join(m.text for m in messages if m.role == "user")
             return any(k in user_text for k in trigger.keywords)
-        return True
+        raise ValueError(f"不支持的 trigger type: {trigger.type}")

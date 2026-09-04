@@ -195,12 +195,15 @@ def extract_scripts(task_prompt: str, flow: FlowDiagram,
                     temperature: float = 0.0,
                     max_attempts: int = 3) -> ExtractedScriptSet:
     system, user = build_prompt(task_prompt, flow, variables)
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
     last_err: Exception | None = None
-    for _attempt in range(max_attempts):
+    for attempt in range(max_attempts):
         response = llm_client.chat(
             judge_model,
-            [{"role": "system", "content": system},
-             {"role": "user", "content": user}],
+            messages,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
             max_tokens=12000,
@@ -210,6 +213,18 @@ def extract_scripts(task_prompt: str, flow: FlowDiagram,
             return ExtractedScriptSet(scripts, flow)
         except (ValueError, yaml.YAMLError) as exc:
             last_err = exc
+            if attempt < max_attempts - 1:
+                messages.extend([
+                    {"role": "assistant", "content": response},
+                    {
+                        "role": "user",
+                        "content": (
+                            "上面的 YAML 无法通过剧本校验，错误为："
+                            f"{exc}。请只返回修正后的完整 YAML；保持所有必填字段、"
+                            "合法 flow 节点和变量引用，不要解释。"
+                        ),
+                    },
+                ])
     raise RuntimeError(
         f"剧本抽取失败（重试 {max_attempts} 次）: {last_err}")
 

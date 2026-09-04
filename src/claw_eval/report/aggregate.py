@@ -95,24 +95,23 @@ def aggregate(results: list[GradingResult]) -> AggregateSummary:
     for br in s.by_rubric.values():
         br["avg_score"] = _round(br["score_sum"] / br["n"])
 
-    # 剧本 × Rubric 热力图
+    # 剧本 × Rubric 热力图。先累计 sum/count，最后一次性求均值；
+    # 不能用 ``(旧均值 + 新值) / 2``，否则第 3 次及之后的 trial 权重会失真。
+    heatmap_totals: dict[str, dict[str, dict[str, float]]] = {}
     for r in results:
         pid = _row_key(r)
-        row = s.heatmap.setdefault(pid, {})
-        cells: dict[str, dict[str, float]] = {}
+        row = heatmap_totals.setdefault(pid, {})
         for rs in r.rubric_scores:
             if not rs.triggered:
                 continue
-            cell = cells.setdefault(rs.rubric_id, {"sum": 0.0, "n": 0.0})
+            cell = row.setdefault(rs.rubric_id, {"sum": 0.0, "n": 0.0})
             cell["sum"] += rs.score
             cell["n"] += 1.0
-        for rid, cell in cells.items():
-            prev = row.get(rid)
-            if prev is None:
-                row[rid] = cell["sum"] / cell["n"]
-            else:
-                # 同 persona 多次 trial:再平均
-                row[rid] = _round((prev + cell["sum"] / cell["n"]) / 2)
+    for pid, row in heatmap_totals.items():
+        s.heatmap[pid] = {
+            rid: _round(cell["sum"] / cell["n"])
+            for rid, cell in row.items()
+        }
 
     # runs 列表(用于报告中「每条运行」表格)
     for r in results:

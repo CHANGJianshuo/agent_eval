@@ -100,7 +100,11 @@ def _grade_trace(trace_path, task: TaskDefinition, rubrics, judge):
     _start, messages, _end = load_trace(trace_path)
     grader = get_grader(task.task_dir)
     result = grader.grade(messages, task, rubrics, judge)
-    result.trace_path = str(trace_path)
+    resolved_trace = Path(trace_path).resolve()
+    try:
+        result.trace_path = str(resolved_trace.relative_to(_ROOT))
+    except ValueError:
+        result.trace_path = str(resolved_trace)
     return result
 
 
@@ -111,6 +115,15 @@ def _echo_result(result, prefix: str = "") -> None:
                    f"safety={d.safety}")
         for v in result.violations:
             typer.echo(f"{prefix}⚠ [{v.rubric_id}] 第{v.turn}轮 {v.detail}")
+
+
+def _batch_completion_status(expected: int, succeeded: int) -> str:
+    """Map case counts to a truthful persisted run status."""
+    if expected > 0 and succeeded == expected:
+        return "done"
+    if succeeded == 0:
+        return "failed"
+    return "partial"
 
 
 def _run_one_trial(task_dir: Path, task_def: TaskDefinition, rubrics,
@@ -329,6 +342,10 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
         typer.echo(f"[batch · uniform] {task_def.task_id}: {len(names)} persona × "
                    f"{trials} trials = {len(pairs)} 次,并发 {n_workers}")
 
+    if not pairs:
+        typer.echo("[error] 没有可运行的 case，请检查 persona、权重或 total")
+        raise typer.Exit(1)
+
     run_id = label or datetime.now().strftime("%Y%m%d_%H%M%S")
     typer.echo(f"  run_id = {run_id} → traces/{run_id}/")
     by_persona: dict[str, list[float]] = {name: [] for name in names}
@@ -358,6 +375,7 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
         for i, p in enumerate(generated_personas):
             persona_map[i] = p
 
+    failures: list[str] = []
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         futures = {
             ex.submit(_run_one_trial, task_dir, task_def, rubrics,
@@ -374,6 +392,7 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
                 score = fut.result()
                 by_persona[name].append(score)
             except Exception as exc:  # noqa: BLE001
+                failures.append(f"{name} t{idx + 1}: {exc}")
                 with _LOG_LOCK:
                     typer.echo(f"  ✗ [{name} t{idx + 1}] 失败: {exc}")
             with _LOG_LOCK:
@@ -397,8 +416,14 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
         from .db import update_run
         pass_rate = n_pass / len(all_scores) if all_scores else 0.0
         score_avg = (sum(all_scores) / len(all_scores)) if all_scores else 0.0
-        update_run(run_id, status="done", n_results=len(all_scores),
-                    pass_rate=pass_rate, task_score_avg=score_avg)
+        run_status = _batch_completion_status(len(pairs), len(all_scores))
+        note = ""
+        if failures:
+            note = f"{len(failures)}/{len(pairs)} cases failed; " + \
+                " | ".join(failures[:3])
+        update_run(run_id, status=run_status, n_results=len(all_scores),
+                    pass_rate=pass_rate, task_score_avg=score_avg,
+                    note=note[:1000])
     except Exception:  # noqa: BLE001
         pass
 
@@ -410,6 +435,12 @@ def batch(task: str = typer.Option(..., help="任务 id 或目录"),
             typer.echo(f"Dashboard: {out}")
         except Exception as exc:  # noqa: BLE001
             typer.echo(f"  [warn] dashboard 生成失败: {exc}")
+
+    if failures:
+        typer.echo(
+            f"\n[error] batch 未完整成功: {len(failures)}/{len(pairs)} 个 case 失败"
+        )
+        raise typer.Exit(1)
 
 
 @app.command("safety-test")
@@ -996,7 +1027,7 @@ def web(port: int = typer.Option(8000, help="FastAPI 端口"),
     前端 dev 模式:cd web && npm install && npm run dev(占 :5173)
     或先 npm run build,FastAPI 同端口托管 SPA。
 
-    Swagger:http://localhost:8000/docs
+    Swagger:http://localhost:8000/api/docs
     """
     try:
         import uvicorn
@@ -1006,7 +1037,7 @@ def web(port: int = typer.Option(8000, help="FastAPI 端口"),
         raise typer.Exit(1)
     app_ = create_app()
     typer.echo(f"启动 web: http://localhost:{port}/")
-    typer.echo(f"Swagger:  http://localhost:{port}/docs")
+    typer.echo(f"Swagger:  http://localhost:{port}/api/docs")
     typer.echo(f"前端 dev:cd web && npm install && npm run dev")
     uvicorn.run(app_, host=host, port=port, log_level="info")
 

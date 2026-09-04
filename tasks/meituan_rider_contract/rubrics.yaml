@@ -24,7 +24,7 @@ rubrics:
 - id: flow.mention_continuous_days
   dimension: completion
   method: llm_judge
-  check: 站长是否说明需要连续 {Y} 天完成配送，否则合同将受到影响。
+  check: 站长是否说明需要连续 {W} 天完成配送，否则合同将受到影响。
   weight: 0.1
   category: flow
   confidence: 0.85
@@ -48,9 +48,9 @@ rubrics:
   check: 当骑手表现出不想配送或犹豫时，站长是否进行了挽留和鼓励，并提醒注意安全。
   weight: 0.15
   trigger:
-    type: user_intent
+    type: probe
     desc: 用户表示无法配送或犹豫
-    keywords: []
+    probe_id: trigger_refusal
   category: behavior
   confidence: 0.8
 - id: behavior.comfort_hangup
@@ -59,10 +59,9 @@ rubrics:
   check: 当骑手坚持确实无法配送时，站长是否表达安慰，然后结束通话（挂断）。
   weight: 0.1
   trigger:
-    type: user_state
+    type: probe
     desc: 用户坚持不能配送
-    state: insist_unable_to_deliver
-    keywords: []
+    probe_id: trigger_insist_refusal
   category: behavior
   confidence: 0.8
 - id: behavior.out_of_scope_response
@@ -129,7 +128,7 @@ rubrics:
 - id: faq.slot_occupancy
   dimension: completion
   method: llm_judge
-  check: 当骑手表达担心名额或无法连续配送时，站长是否说明如果你无法连续配送 {Y} 天，名额可能会被他人占用。
+  check: 当骑手表达担心名额或无法连续配送时，站长是否说明如果你无法连续配送 {W} 天，名额可能会被他人占用。
   weight: 0.08
   trigger:
     type: user_keyword
@@ -156,14 +155,14 @@ rubrics:
     - 额外
   category: faq
   confidence: 0.9
-- id: constraint.length_30
+- id: constraint.length_50
   dimension: robustness
   method: length
-  check: 每次回复字数不超过约30字。
+  check: 每次回复不超过50个字符。
   weight: 0.2
   params:
-    max_chars: 30
-    tolerance: 0.2
+    max_chars: 50
+    tolerance: 0
   category: constraint
   confidence: 0.95
 - id: constraint.no_placeholder_visible

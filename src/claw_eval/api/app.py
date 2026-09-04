@@ -22,6 +22,8 @@ def create_app() -> FastAPI:
         title="DialAgentEval API",
         description="对话模型指令遵循自动评测系统",
         version="0.1.0",
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
     )
 
     # CORS:允许前端 dev 服务器(Vite 默认 5173)调

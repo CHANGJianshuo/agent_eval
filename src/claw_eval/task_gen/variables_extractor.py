@@ -9,6 +9,7 @@ import json
 import re
 
 from ..runner import llm_client
+from ..templating import placeholder_names
 
 
 _SYSTEM_PROMPT = """\
@@ -77,5 +78,5 @@ def extract_variables(task_prompt: str, judge_model: str,
 
 
 def auto_detect_placeholders(task_prompt: str) -> set[str]:
-    """正则抽 `{name}` 占位符 —— 不需要 LLM 也能拿到这部分。"""
-    return set(re.findall(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", task_prompt))
+    """抽取 ``{name}`` / ``${name}`` 占位符,不依赖 LLM。"""
+    return placeholder_names(task_prompt)

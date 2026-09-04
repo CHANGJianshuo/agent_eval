@@ -58,11 +58,10 @@ rubrics:
 - id: constraint.length
   dimension: robustness
   method: length
-  check: 每条助手回复字数在 {reply_word_limit_min} 到 {reply_word_limit_max} 字之间
+  check: 每条助手回复不超过 {reply_word_limit_max} 个字符
   weight: 0.3
   params:
-    min_chars: 15
-    max_chars: 20
+    max_chars: 40
     tolerance: 0
   category: constraint
   confidence: 0.99

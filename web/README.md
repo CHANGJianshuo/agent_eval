@@ -58,7 +58,7 @@ npm run dev                  # 起在 :5173,自动 proxy /api/* 到 :8000
 
 打开浏览器 `http://localhost:5173/`。
 
-后端的 Swagger:`http://localhost:8000/docs`。
+后端的 Swagger:`http://localhost:8000/api/docs`。
 
 ### 生产构建(可选)
 

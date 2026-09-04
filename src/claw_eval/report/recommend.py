@@ -161,7 +161,8 @@ def generate_recommendation(task: TaskDefinition,
                             judge_model: str,
                             rubric_check: str = "",
                             rubric_weight: float = 0.0,
-                            reasoning_effort: str = "medium") -> dict:
+                            reasoning_effort: str = "medium",
+                            max_attempts: int = 2) -> dict:
     """调 LLM 产单条建议(只针对一条弱 rubric)。"""
     user = (
         _USER_TEMPLATE
@@ -175,15 +176,40 @@ def generate_recommendation(task: TaskDefinition,
         .replace("{n_samples}", str(len(samples)))
         .replace("{violations_block}", _format_violations(samples))
     )
-    response = llm_client.chat(
-        judge_model,
-        [{"role": "system", "content": _SYSTEM_PROMPT},
-         {"role": "user", "content": user}],
-        temperature=0.0,
-        reasoning_effort=reasoning_effort,
-        max_tokens=4000,                     # 预留 reasoning + 完整建议
-    )
-    return _parse_recommendation(response)
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+    last_err: Exception | None = None
+    for attempt in range(max_attempts):
+        response = llm_client.chat(
+            judge_model,
+            messages,
+            temperature=0.0,
+            reasoning_effort=reasoning_effort,
+            max_tokens=6000,                 # 兼顾 reasoning 与完整 YAML 正文
+        )
+        try:
+            parsed = _parse_recommendation(response)
+            if not parsed.get("suggested_prompt_change"):
+                raise ValueError("缺少 suggested_prompt_change")
+            return parsed
+        except (ValueError, yaml.YAMLError) as exc:
+            last_err = exc
+            if attempt < max_attempts - 1:
+                messages.extend([
+                    {"role": "assistant", "content": response},
+                    {
+                        "role": "user",
+                        "content": (
+                            "上面的建议不是可解析的完整 YAML，错误为："
+                            f"{exc}。请只返回包含 suggested_prompt_change、rationale、"
+                            "estimated_lift、confidence 四个字段的修正 YAML；长文本用 |，"
+                            "含冒号的单行文本加双引号，不要输出推理过程。"
+                        ),
+                    },
+                ])
+    raise ValueError(f"建议 YAML 修正 {max_attempts} 次后仍失败: {last_err}")
 
 
 # ============================ 主入口 ============================

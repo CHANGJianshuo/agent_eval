@@ -22,8 +22,9 @@ async function ensureMockCheck(): Promise<boolean> {
 
 async function withFallback<T>(real: () => Promise<T>, mock: () => T): Promise<T> {
   if (await ensureMockCheck()) return mock()
-  try { return await real() }
-  catch { return mock() }
+  // Once the health check confirms a real backend, surface validation and
+  // server errors instead of turning them into convincing mock successes.
+  return real()
 }
 
 
@@ -180,8 +181,8 @@ export const TasksAPI = {
     () => api.get<{ rubrics: any[]; is_draft: boolean }>(`/tasks/${id}/rubrics`).then(r => r.data),
     () => ({ rubrics: MOCK_RUBRICS, is_draft: false }),
   ),
-  updateRubrics: (id: string, rubrics: any[]) =>
-    api.put(`/tasks/${id}/rubrics`, { rubrics }).then(r => r.data),
+  updateRubrics: (id: string, rubrics: any[], isDraft = false) =>
+    api.put(`/tasks/${id}/rubrics`, { rubrics, is_draft: isDraft }).then(r => r.data),
   flow: (id: string) => withFallback(
     () => api.get<{ nodes: FlowNode[]; edges: string[][] }>(`/tasks/${id}/flow`).then(r => r.data),
     () => ({ nodes: [], edges: [] }),
@@ -207,7 +208,12 @@ export const TasksAPI = {
       rubrics_approved: boolean; rubrics_draft: boolean;
       personas_approved: string[]; personas_pending: string[]
     }>(`/tasks/${id}/review-status`).then(r => r.data),
-    () => ({ rubrics_approved: true, rubrics_draft: false, personas_approved: [], personas_pending: [] }),
+    () => ({
+      rubrics_approved: true,
+      rubrics_draft: false,
+      personas_approved: (MOCK_SCRIPTS[id] || []).map(script => script.id),
+      personas_pending: [],
+    }),
   ),
   approve: (id: string, approveRubrics: boolean, approvePersonas: string[]) => withFallback(
     () => api.post(`/tasks/${id}/approve`, {

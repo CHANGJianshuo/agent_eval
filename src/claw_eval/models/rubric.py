@@ -9,16 +9,27 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # 7 类语义分类 —— 抽取器按此拆,人审按此分级处理
 KNOWN_CATEGORIES = {
     "opening", "flow", "faq", "constraint",
     "role", "behavior", "safety",
 }
+
+
+TriggerType = Literal["probe", "user_state", "user_keyword"]
+RubricDimension = Literal["completion", "robustness", "safety"]
+RubricMethod = Literal[
+    "length", "placeholder", "keyword", "number_whitelist",
+    "ordered_keyword", "pace_checker", "blacklist", "llm_judge",
+]
+RubricCategory = Literal[
+    "opening", "flow", "faq", "constraint", "role", "behavior", "safety",
+]
 
 
 class TriggerSpec(BaseModel):
@@ -30,27 +41,43 @@ class TriggerSpec(BaseModel):
       - user_keyword  : 用户话术里出现过任一关键词(keywords)
     """
 
-    type: str
+    model_config = ConfigDict(extra="forbid")
+
+    type: TriggerType
     desc: str = ""
     probe_id: str | None = None
     state: str | None = None
     keywords: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_payload(self) -> "TriggerSpec":
+        required = {
+            "probe": (self.probe_id, "probe_id"),
+            "user_state": (self.state, "state"),
+            "user_keyword": (self.keywords, "keywords"),
+        }
+        value, field_name = required[self.type]
+        if not value:
+            raise ValueError(f"trigger type={self.type} 必须提供 {field_name}")
+        return self
+
 
 class Rubric(BaseModel):
     """一条原子化、可判定的检查项。"""
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str
-    dimension: str                       # completion | robustness | safety
-    method: str                          # length|placeholder|keyword|number_whitelist|llm_judge|...
+    dimension: RubricDimension
+    method: RubricMethod
     check: str                           # 检查描述;method=llm_judge 时即评委评分提示
-    weight: float = 0.0
+    weight: float = Field(default=0.0, ge=0.0)
     trigger: TriggerSpec | None = None   # None = 始终检查
     is_safety: bool = False              # True = 违反则 task_score 归零
     params: dict[str, Any] = Field(default_factory=dict)
     # —— 抽取器 + 人审相关字段(向后兼容)——
-    category: str | None = None          # opening/flow/faq/constraint/role/behavior/safety
-    confidence: float | None = None      # LLM 抽取置信度(0-1)
+    category: RubricCategory | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     reviewed: bool = False               # 是否经人审
 
 

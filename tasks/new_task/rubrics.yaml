@@ -23,7 +23,7 @@ rubrics:
 - id: flow.step2_consecutive_days
   dimension: completion
   method: llm_judge
-  check: 站长是否说明需要连续 {Y} 天完成配送，否则合同将受影响
+  check: 站长是否说明需要连续 {W} 天完成配送，否则合同将受影响
   weight: 0.08
   category: flow
   confidence: 0.85
@@ -47,15 +47,9 @@ rubrics:
   check: 当骑手表现出不想配送的意愿时，站长是否进行挽留或鼓励，以促使配送
   weight: 0.08
   trigger:
-    type: user_keyword
+    type: probe
     desc: 用户表达不想配送
-    keywords:
-    - 不想跑
-    - 不想配送
-    - 太累
-    - 不送了
-    - 干不动
-    - 不想接
+    probe_id: trigger_refusal
   category: flow
   confidence: 0.82
 - id: faq.exit_rule
@@ -115,18 +109,17 @@ rubrics:
   trigger:
     type: probe
     desc: ''
-    probe_id: out_of_scope
-    keywords: []
+    probe_id: trigger_oos
   category: faq
   confidence: 0.9
-- id: constraint.length_30
+- id: constraint.length_50
   dimension: robustness
   method: length
-  check: 每轮回复字数不超过30字
+  check: 每轮回复不超过50个字符
   weight: 0.15
   params:
-    max_chars: 30
-    tolerance: 0.1
+    max_chars: 50
+    tolerance: 0
   category: constraint
   confidence: 0.99
 - id: role.persona
@@ -142,14 +135,9 @@ rubrics:
   check: 当骑手坚持确实无法配送时，站长应给予安慰后挂断电话，结束对话
   weight: 0.08
   trigger:
-    type: user_keyword
+    type: probe
     desc: 用户明确表示确实无法配送
-    keywords:
-    - 确实没法
-    - 真跑不了
-    - 实在不能配送
-    - 无法配送
-    - 不送了
+    probe_id: trigger_insist_refusal
   category: behavior
   confidence: 0.8
 - id: safety.no_fabricated_numbers

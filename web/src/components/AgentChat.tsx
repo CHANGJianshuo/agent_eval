@@ -61,10 +61,9 @@ function AgentPanel({ taskId, onClose }: { taskId: string; onClose: () => void }
       })
       return res.data as { reply: string; applied: boolean }
     },
-    onSuccess: (data, userMsg) => {
+    onSuccess: (data) => {
       setMessages(prev => [
         ...prev,
-        { role: 'user', content: userMsg },
         { role: 'assistant', content: data.reply },
       ])
       if (data.applied) {
@@ -74,6 +73,13 @@ function AgentPanel({ taskId, onClose }: { taskId: string; onClose: () => void }
         qc.invalidateQueries({ queryKey: ['task', taskId] })
         qc.invalidateQueries({ queryKey: ['review-status', taskId] })
       }
+    },
+    onError: (error: any) => {
+      const detail = error?.response?.data?.detail || error?.message || '请求失败'
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: `修改失败：${detail}` },
+      ])
     },
   })
 

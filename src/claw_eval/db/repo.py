@@ -7,7 +7,7 @@
   created_at      ISO 时间
   agent_version   开跑时 task.yaml 对应的版本 label(可空)
   params          JSON 串(total / concurrency / no_judge / personas / noise_overlay / ...)
-  status          running / done / failed / canceled
+  status          running / done / partial / failed / canceled
   n_results       完成评分的 case 数
   pass_rate       通过率
   task_score_avg  task_score 平均

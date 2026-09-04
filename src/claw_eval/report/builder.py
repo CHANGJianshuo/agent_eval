@@ -26,6 +26,18 @@ from .flow_viz import (
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
+def _project_root() -> Path:
+    """Find the checkout root without making assumptions about trace depth."""
+    current = Path(__file__).resolve()
+    for candidate in [current.parent, *current.parents]:
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    return Path.cwd().resolve()
+
+
+_PROJECT_ROOT = _project_root()
+
+
 def _env():
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     return Environment(
@@ -54,11 +66,42 @@ def _build_turn_view(messages: list[TraceMessage], result: GradingResult):
     } for m in messages]
 
 
-def _infer_task_dir(result: GradingResult) -> Path | None:
-    """从 result.trace_path 推 tasks/<task_id>/。trace 路径形如 <root>/traces/X.jsonl。"""
-    if not result.trace_path:
+def _resolve_trace_path(trace_path: str | None) -> Path | None:
+    """Resolve current, relative, and checkout-moved trace paths."""
+    if not trace_path:
         return None
-    return Path(result.trace_path).resolve().parents[1] / "tasks" / result.task_id
+
+    raw = Path(trace_path).expanduser()
+    candidates = [raw]
+    if not raw.is_absolute():
+        candidates.extend([_PROJECT_ROOT / raw, Path.cwd() / raw])
+
+    # Results created before a checkout was moved contain an obsolete absolute
+    # prefix. Preserve the path below ``traces/`` and rebase it onto this repo.
+    if "traces" in raw.parts:
+        idx = raw.parts.index("traces")
+        relative = Path(*raw.parts[idx + 1:])
+        candidates.append(_PROJECT_ROOT / "traces" / relative)
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    return None
+
+
+def _infer_task_dir(result: GradingResult) -> Path | None:
+    """Locate ``tasks/<task_id>`` for flat or nested trace layouts."""
+    canonical = _PROJECT_ROOT / "tasks" / result.task_id
+    if canonical.is_dir():
+        return canonical
+
+    trace = _resolve_trace_path(result.trace_path)
+    if trace:
+        for parent in trace.parents:
+            candidate = parent / "tasks" / result.task_id
+            if candidate.is_dir():
+                return candidate
+    return None
 
 
 def _flow_option_for_case(result: GradingResult,
@@ -79,8 +122,9 @@ def build_case_report(result: GradingResult, out_path: str | Path,
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     messages: list[TraceMessage] = []
-    if result.trace_path and Path(result.trace_path).exists():
-        _start, messages, _end = load_trace(result.trace_path)
+    trace_path = _resolve_trace_path(result.trace_path)
+    if trace_path:
+        _start, messages, _end = load_trace(trace_path)
 
     tdir = Path(task_dir) if task_dir else _infer_task_dir(result)
     flow_option = _flow_option_for_case(result, tdir)
@@ -298,9 +342,15 @@ def build_dashboard_from_dir(traces_dir: str | Path,
     results = load_results_dir(traces_dir)
 
     task_names: dict[str, str] = {}
-    # 寻找 tasks/ 目录:先试同级,再试上两级(run 子目录场景)
+    # 寻找 tasks/ 目录:支持 traces/、traces/<run_id>/ 以及更深层布局。
     td = Path(traces_dir).resolve()
-    for candidate in [td.parent / "tasks", td.parent.parent / "tasks"]:
+    candidates = [_PROJECT_ROOT / "tasks"]
+    candidates.extend(parent / "tasks" for parent in [td, *td.parents])
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
         if candidate.is_dir():
             for tdir in sorted(candidate.iterdir()):
                 ty = tdir / "task.yaml"

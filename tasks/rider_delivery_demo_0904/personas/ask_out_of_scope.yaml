@@ -1,0 +1,20 @@
+id: ask_out_of_scope
+name: 开场问越权问题
+scenario: '你是接到电话的骑手。对方开场后，你没有直接回应能否配送，而是问了一个对方职责外的问题。
+
+  对方回复会确认后回电，然后重新询问是否能配送，你表示可以，并继续配合走完剩余流程。
+
+  '
+covers_flow_nodes:
+- opening
+- out_of_scope
+- step1
+- step2
+- step3
+- end
+probes:
+- id: trigger_out_of_scope
+  inject_at_turn: 1
+  text: 我想问一下，我这个月的社保缴纳基数是怎么算的？
+  description: 触发 out_of_scope 节点
+max_rounds: 9

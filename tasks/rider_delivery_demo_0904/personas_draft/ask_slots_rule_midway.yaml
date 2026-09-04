@@ -1,0 +1,20 @@
+id: ask_slots_rule_midway
+name: step1时问名额占用
+scenario: '你是接到电话的骑手。对方开场后你表示可以配送，对方开始说明连续配送约束。
+
+  你中途插话询问名额是否会被占用，对方回答后继续说明，你表示了解并配合走完剩余流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- faq_slots
+- step2
+- step3
+- end
+probes:
+- id: trigger_faq_slots
+  inject_at_turn: 2
+  text: 那要是这三天我有事送不了，我这个名额会被别人顶掉吗？
+  description: 触发 faq_slots 节点
+max_rounds: 9

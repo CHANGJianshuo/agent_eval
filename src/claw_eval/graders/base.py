@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from ..models.rubric import Rubric
 from ..models.task import TaskDefinition
 from ..models.trace import GradingResult, TraceMessage, Violation
+from ..templating import render_template
 
 
 # llm_judge 得分低于此值,记一条 violation
@@ -67,6 +68,7 @@ class AbstractGrader(ABC):
 
         if method == "number_whitelist":
             whitelist = list(task.number_whitelist())
+            whitelist += [str(x) for x in params.get("whitelist", [])]
             whitelist += [str(x) for x in params.get("extra_whitelist", [])]
             res = check_number_whitelist(messages, whitelist=whitelist)
             return res.score, res.detail, None, res.violations
@@ -113,10 +115,7 @@ class AbstractGrader(ABC):
     @staticmethod
     def _fmt(text: str, variables: dict) -> str:
         """把 rubric.check 里的 {变量} 代入,保持评分标准与 task 变量同源。"""
-        try:
-            return text.format(**variables)
-        except (KeyError, IndexError, ValueError):
-            return text
+        return render_template(text, variables)
 
     @staticmethod
     def _scope_text(messages: list[TraceMessage], scope: str) -> str:

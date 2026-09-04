@@ -7,6 +7,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from ..templating import render_template
+
 
 class TaskDefinition(BaseModel):
     """一个被评测任务的定义。"""
@@ -28,11 +30,8 @@ class TaskDefinition(BaseModel):
         return cls.model_validate(data)
 
     def rendered_prompt(self) -> str:
-        """把变量代入 Prompt 模板 —— SUT 收到的是代入真值后的 Prompt。"""
-        try:
-            return self.prompt.format(**self.variables)
-        except (KeyError, IndexError, ValueError):
-            return self.prompt
+        """把变量代入 Prompt 模板;缺值时立即报错,避免带病跑评测。"""
+        return render_template(self.prompt, self.variables)
 
     def number_whitelist(self) -> list[str]:
         """任务允许出现的数字 = 所有数值型变量。供数字白名单 matcher 使用。"""

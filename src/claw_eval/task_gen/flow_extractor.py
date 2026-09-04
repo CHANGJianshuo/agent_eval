@@ -84,12 +84,15 @@ def extract_flow(task_prompt: str, judge_model: str,
                  max_attempts: int = 3) -> FlowDiagram:
     """调 LLM 抽 flow.yaml，失败自动重试。"""
     system, user = build_prompt(task_prompt)
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
     last_err: Exception | None = None
     for attempt in range(max_attempts):
         response = llm_client.chat(
             judge_model,
-            [{"role": "system", "content": system},
-             {"role": "user", "content": user}],
+            messages,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
             max_tokens=4000,
@@ -98,6 +101,18 @@ def extract_flow(task_prompt: str, judge_model: str,
             return parse_flow_output(response)
         except (ValueError, yaml.YAMLError) as exc:
             last_err = exc
+            if attempt < max_attempts - 1:
+                messages.extend([
+                    {"role": "assistant", "content": response},
+                    {
+                        "role": "user",
+                        "content": (
+                            "上面的 YAML 无法解析，错误为："
+                            f"{exc}。请只返回修正后的完整 YAML；尤其要给包含冒号、"
+                            "花括号或井号的字符串加双引号，不要解释。"
+                        ),
+                    },
+                ])
     raise RuntimeError(
         f"flow 抽取失败（重试 {max_attempts} 次）: {last_err}")
 
