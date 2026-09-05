@@ -1,0 +1,21 @@
+id: ask_quota_risk
+name: 询问名额被占用风险
+scenario: '你是接到电话的用户。介绍天数要求时，你担心万一自己连续不了名额会被抢，
+
+  于是问了这个风险。得到站长安慰和解释后继续配合后续流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_quota_risk
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_quota_risk
+  inject_at_turn: 3
+  text: 如果我没办法连续跑那么多天，名额会被别人占了不？
+  description: 触发 faq_quota_risk 节点
+max_rounds: 8

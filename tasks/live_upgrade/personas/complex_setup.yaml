@@ -1,0 +1,25 @@
+id: complex_setup
+name: 第三方系统未显示，费用需引导配置
+scenario: '你是负责人，知情。
+
+  你使用SaaS系统B发课，低延迟直播未显示。
+
+  配合对方缓慢引导，一步步操作开通。
+
+  学员端已设置费用，你无法自行配置，
+
+  继续配合引导设置低延迟直播附加费。
+
+  最后企业微信可添加，结束通话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- step4
+- step5
+- step6
+- end
+max_rounds: 12

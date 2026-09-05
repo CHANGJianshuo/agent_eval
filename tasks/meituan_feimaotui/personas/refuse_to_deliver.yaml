@@ -1,0 +1,23 @@
+id: refuse_to_deliver
+name: 坚持无法配送
+scenario: '你是飞毛腿骑手。站长告知合同生效并说明配送约束时，你表示最近腰疼实在跑不动。
+
+  对方挽留，你仍然坚持无法配送，对方安慰后挂断电话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- end
+probes:
+- id: trigger_refusal
+  inject_at_turn: 2
+  text: 站长，我最近腰疼，不太想跑了，能不能不配送？
+  description: 在 step2 时表达拒绝，触发站长挽留
+- id: trigger_insist_refusal
+  inject_at_turn: 3
+  text: 确实没办法，我今天真的跑不了。
+  description: 挽留后坚持拒绝，触发安慰并结束通话
+max_rounds: 7

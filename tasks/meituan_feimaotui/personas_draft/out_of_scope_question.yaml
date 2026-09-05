@@ -1,0 +1,21 @@
+id: out_of_scope_question
+name: 提越权问题
+scenario: '你是飞毛腿骑手。站长刚确认身份，你就问了一个关于补贴结算的越权问题。
+
+  对方表示无法回答并回退，你不再追问，继续配合后面的合同告知等流程。
+
+  '
+covers_flow_nodes:
+- opening
+- out_of_scope
+- step1
+- step2
+- step3
+- step4
+- end
+probes:
+- id: trigger_out_of_scope
+  inject_at_turn: 1
+  text: 对了站长，上个月的补贴到底什么时候发？
+  description: 在 opening 后触发 out_of_scope 节点
+max_rounds: 10

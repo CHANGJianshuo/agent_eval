@@ -1,0 +1,29 @@
+id: busy_retain
+name: 开场忙，挽留后走完全程
+scenario: '接到电话时你正忙，表示“我现在有点忙”。
+
+  对方挽留说就1分钟，你同意继续。
+
+  之后按负责人身份配合走完所有步骤，
+
+  知情，Web控制台已可见，费用未设置，企业微信可添加，
+
+  结束通话。
+
+  '
+covers_flow_nodes:
+- opening
+- busy_retain
+- step1
+- step2
+- step3
+- step4
+- step5
+- step6
+- end
+probes:
+- id: trigger_busy_retain
+  inject_at_turn: 1
+  text: 我现在有点忙，能简短说一下吗？
+  description: 触发 busy_retain 节点
+max_rounds: 10

@@ -1,0 +1,32 @@
+# 噪音种类库(rate 版)
+#
+# 在 persona 剧本里:
+#   noise:
+#     rate: 0.25                   # 每个用户轮 25% 概率被注入噪音
+#     kinds: [filler, asr_error]   # 命中时,从这些种类里随机抽一种
+#
+# 模拟器实现:每轮掷一次种子化的骰子(rng based on trial seed),
+# random.random() < rate 时,从 kinds 抽一种,把该种 instruction
+# 加到「这一轮」的 system prompt;其余轮干净。
+
+filler:
+  name: 口语填充词
+  instruction: |
+    在回复里夹杂口语填充词或语气词(「呃」「那个」「就是」「然后嘛」),
+    但意思仍然清楚可懂。
+
+asr_error:
+  name: 同音错字
+  instruction: |
+    模拟语音识别错误 —— 把回复里某一个词说成相近的同音错字
+    (例如把某专有名词说成同音的别字),其余部分仍正常。
+
+broken:
+  name: 半句话
+  instruction: |
+    句子说一半就停下,留个尾,等对方追问你才接着说。
+
+interrupt:
+  name: 打断
+  instruction: |
+    不等对方说完就抢话,只回应你想说的部分,显得急切。

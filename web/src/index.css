@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Linear / Vercel 风格,简净灰阶 */
+    color-scheme: light;
+  }
+  html, body {
+    background: hsl(0 0% 100%);
+    color: hsl(240 10% 4%);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply font-sans antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-border bg-background;
+  }
+  .card-hover {
+    @apply transition-shadow hover:shadow-sm hover:border-foreground/10;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5
+           rounded-md text-sm font-medium
+           transition-colors focus-visible:outline-none
+           focus-visible:ring-2 focus-visible:ring-foreground/20
+           disabled:pointer-events-none disabled:opacity-50
+           px-3 py-1.5 h-8;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+  .btn-outline {
+    @apply border border-border bg-background hover:bg-accent;
+  }
+  .btn-ghost {
+    @apply hover:bg-accent;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1
+           rounded-md px-2 py-0.5
+           text-xs font-medium
+           border border-border bg-muted text-muted-foreground;
+  }
+  .badge-success {
+    @apply bg-success/10 text-success border-success/20;
+  }
+  .badge-warning {
+    @apply bg-warning/10 text-warning border-warning/20;
+  }
+  .badge-danger {
+    @apply bg-destructive/10 text-destructive border-destructive/20;
+  }
+}

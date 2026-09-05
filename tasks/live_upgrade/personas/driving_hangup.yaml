@@ -1,0 +1,17 @@
+id: driving_hangup
+name: 开车挂断
+scenario: '接到电话时你在开车，明确表示“我在开车，不方便接电话”。
+
+  对方礼貌回应后挂断。
+
+  '
+covers_flow_nodes:
+- opening
+- driving_hangup
+- end
+probes:
+- id: trigger_driving_hangup
+  inject_at_turn: 1
+  text: 我在开车，不方便接电话。
+  description: 触发 driving_hangup 节点
+max_rounds: 3

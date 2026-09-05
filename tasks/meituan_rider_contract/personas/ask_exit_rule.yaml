@@ -1,0 +1,21 @@
+id: ask_exit_rule
+name: 询问退出规则
+scenario: '你是接到电话的用户。听完合同说明后，你顺便问一句退出飞毛腿该怎么操作，
+
+  以免后续麻烦。站长解答后你表示了解，继续听后面的内容。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_exit
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_exit
+  inject_at_turn: 3
+  text: 万一之后不想做了，怎么退出飞毛腿呢？
+  description: 触发 faq_exit 节点
+max_rounds: 8

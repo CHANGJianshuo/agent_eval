@@ -1,0 +1,27 @@
+id: happy_path_full
+name: 主流程完整路径（负责人知情，Web已可见）
+scenario: '你是机构负责人，接到电话后确认身份。
+
+  对低延迟线路的事表示知情。
+
+  配合对方介绍升级内容。
+
+  告知通过Web控制台发课，低延迟直播已显示。
+
+  学员端未设置费用。
+
+  企业微信可添加。
+
+  最后无其他问题，结束通话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- step4
+- step5
+- step6
+- end
+max_rounds: 8

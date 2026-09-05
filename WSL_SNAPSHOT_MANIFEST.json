@@ -1,0 +1,1480 @@
+{
+  "source": "/home/chang/2026_6_to_8/tel_agent_eval",
+  "included": [
+    {
+      "path": ".github/workflows/test.yml",
+      "sha256": "9885d985f9fea03427543f43be7dcd0e43dc8f41f55d50a3316956cea8ef884b",
+      "bytes": 1643
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "f086f542054589af87d14665b81e3395de8bc41832186a6930cbf70d29255122",
+      "bytes": 478
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "0cc9e858536878b5b52dab3f20582cc815a1773760e09ae976f2d460b502d8db",
+      "bytes": 9846
+    },
+    {
+      "path": "README.md",
+      "sha256": "c6ae502f42baa4f07ebd12cbbad03f38f2c79767c02956597304e0e61ed407ce",
+      "bytes": 13881
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "8d0a3d09625481c15b556b2fb81ec11f50730f589757692e46bc7d36b97a2cca",
+      "bytes": 4270
+    },
+    {
+      "path": "configs/adversarial_probes.yaml",
+      "sha256": "819862326dd39986394763e194ea9aa459b40288df09e3c735e91ac9667a8cdd",
+      "bytes": 1262
+    },
+    {
+      "path": "configs/dimensions.yaml",
+      "sha256": "0749edd1b91d6a4dfa53029cd844f0b34e623791979445d5d412774d38321c9e",
+      "bytes": 4094
+    },
+    {
+      "path": "configs/models.yaml",
+      "sha256": "d7de78e779efcef750a6b5219bdf2aa01302bdcd21ad8dc07314fae6b847cf35",
+      "bytes": 1807
+    },
+    {
+      "path": "configs/noise_profiles.yaml",
+      "sha256": "711ded167a786dba194f1a21d921d3694a965f088fa81d4288b0e5bddd740635",
+      "bytes": 1075
+    },
+    {
+      "path": "demo/DEMO_PLAN.md",
+      "sha256": "e385119b1414ef1782fe754437d8971bc68fb2440275782bb956950ad713050c",
+      "bytes": 2181
+    },
+    {
+      "path": "demo/demo_prompt.md",
+      "sha256": "1c2dbdcd824b4697200650cce55a76a3a9fb0f84a04335377c121a294c894ae3",
+      "bytes": 2062
+    },
+    {
+      "path": "demo/record_demo.py",
+      "sha256": "2f5f6a16b31d60c979612ee35a1ad0d5673ea3fd9bcba442f219e8b94fd96c0e",
+      "bytes": 35884
+    },
+    {
+      "path": "deploy/qr_blue.png",
+      "sha256": "07de7ab8a7aa79886505ec095d50fb5175add82c6856e6f6239a164e4c6150e4",
+      "bytes": 26349
+    },
+    {
+      "path": "deploy/qr_classic.png",
+      "sha256": "727f2b5d4ffc1a74f21ae0eed4dc7ec1ce0a82a57510766874db9dbc4fdd3828",
+      "bytes": 4667
+    },
+    {
+      "path": "deploy/qr_dotted.png",
+      "sha256": "93a2334887ffaf1130e9dd73bbba9ad3ead3528cc6e8cea1dfa66c6080c2fe4f",
+      "bytes": 4965
+    },
+    {
+      "path": "deploy/qr_rounded.png",
+      "sha256": "3e01cd922057ef5e2010430a84421d622f00e3509934a4db2962e261fb0a460b",
+      "bytes": 27223
+    },
+    {
+      "path": "docs/feature-audit-2026-09-05.md",
+      "sha256": "c8cd4a6c7818df513119e0e8dc20d1b44a4912c72fb3996160bae22987124785",
+      "bytes": 18616
+    },
+    {
+      "path": "docs/feature-completion-2026-09-05.md",
+      "sha256": "9ddfe16a852528aaca50d482f03745e42fe41ea9f59f70b8c14bb8be29a2e972",
+      "bytes": 4182
+    },
+    {
+      "path": "docs/research/llm-as-judge-frontier-2026-04-to-09.md",
+      "sha256": "315c53b81d24726759903f200ea7578d3226e989f05589b9e96d3aa05ffe3772",
+      "bytes": 29466
+    },
+    {
+      "path": "docs/research/llm-as-judge-review-2026-09-05.md",
+      "sha256": "39606c7788b4a34a1b8182ae2fa58c511e08353df146cde256ddc0f0dba0c845",
+      "bytes": 32955
+    },
+    {
+      "path": "docs/screenshots/case_report.png",
+      "sha256": "b3351cdf2f816c9182101ffefccf8a9e9f00f74f2f1bbd5bca333a6ddcdedb82",
+      "bytes": 153952
+    },
+    {
+      "path": "docs/screenshots/report_index.png",
+      "sha256": "a32460885927ebf6b5857e0092067ae15c68be745db9e286cd5d62e27111f8ae",
+      "bytes": 135973
+    },
+    {
+      "path": "docs/screenshots/report_task_detail.png",
+      "sha256": "5555a6010e6c06c49b61cb87bf4d2d840cfe4e71204ee9d67e9c4217c589254e",
+      "bytes": 188257
+    },
+    {
+      "path": "docs/screenshots/task_list.png",
+      "sha256": "371e2af9c9607fc5dd9a5caf6c5b1b9a749bb994e94523ae62b0c27496718213",
+      "bytes": 69336
+    },
+    {
+      "path": "docs/screenshots/task_overview.png",
+      "sha256": "1101bbe1a164fa0c2d00f0cf0516314dd6cbd9862c2b5b44c3f3bfbb19d34ebd",
+      "bytes": 115293
+    },
+    {
+      "path": "meta_eval/samples_live_upgrade.json",
+      "sha256": "3246809d0a10268eef542a714fca71d9d89c2645bde3f21e6a73b2255122b9a5",
+      "bytes": 6030
+    },
+    {
+      "path": "meta_eval/samples_rider_delivery_demo_0904.json",
+      "sha256": "7788378863e905cb16b63b2f75da91f4f52361ea5dfb14cea0e6f596a93e819b",
+      "bytes": 3780
+    },
+    {
+      "path": "personalities/adv_coercive.yaml",
+      "sha256": "0b0ccbb290b0de3c8feb7ad848fc23c25fbc5e2ad5301650d9aa8b864e4b3c02",
+      "bytes": 370
+    },
+    {
+      "path": "personalities/adv_prompt_injector.yaml",
+      "sha256": "de927bc983ba5612017f55608045c340ea929c0eb3bc0e3873110bbc775ded87",
+      "bytes": 480
+    },
+    {
+      "path": "personalities/adv_social_engineer.yaml",
+      "sha256": "df03822763bb323fc2477b006dae25899a4087fc5a43ff73509e01ac3fd93be1",
+      "bytes": 414
+    },
+    {
+      "path": "personalities/argumentative.yaml",
+      "sha256": "06040a262db1e31709bb417e88fb4710b90d2b2b5ade322143ca3844d62c2238",
+      "bytes": 335
+    },
+    {
+      "path": "personalities/blunt.yaml",
+      "sha256": "6e4ab8dd51cf70c2b31251749c7660bf900de9a6961c3fc93776c0824160a9c4",
+      "bytes": 295
+    },
+    {
+      "path": "personalities/confused.yaml",
+      "sha256": "d86eff717d355dfc50a71283a2b32332f19a3f4b47325e1fa9bb1cce9d3cc72c",
+      "bytes": 334
+    },
+    {
+      "path": "personalities/cooperative.yaml",
+      "sha256": "4836ba118e47e3da33216cf3a0f535eb76026e283bfb9498084070700f1c410b",
+      "bytes": 317
+    },
+    {
+      "path": "personalities/hesitant.yaml",
+      "sha256": "bf1a508b3fa07a4e95dca006542911ef7f5d41b41a7c5f9e47a84f350536bb7d",
+      "bytes": 322
+    },
+    {
+      "path": "personalities/hurried.yaml",
+      "sha256": "7b3f190862a88dd7dbc7a976134963ca8ad1c10886addc17e0fe5bbde697c6be",
+      "bytes": 287
+    },
+    {
+      "path": "personalities/refuse.yaml",
+      "sha256": "700dfab39222acdb4adad9ab7109300a05776d199a849e5a1f93d55718513003",
+      "bytes": 303
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "9091bffee482885b66a94d03152eaf4c2566364b53e4747e1e90720a81b3dca0",
+      "bytes": 1093
+    },
+    {
+      "path": "src/claw_eval/__init__.py",
+      "sha256": "0573255ee733e847963ce377c13daa95b1598e488e0827e2d248692bfb48e730",
+      "bytes": 92
+    },
+    {
+      "path": "src/claw_eval/adversarial.py",
+      "sha256": "27124dafed752dba0003bac850f8a1bf9258883e497298fbe6128e0867bbf5f7",
+      "bytes": 6532
+    },
+    {
+      "path": "src/claw_eval/api/__init__.py",
+      "sha256": "48dffdc459732e0a4a1a9809922ef29a4957c9158943186e9efe7930d1d00235",
+      "bytes": 980
+    },
+    {
+      "path": "src/claw_eval/api/app.py",
+      "sha256": "0f23a5d0d95da5e04e657cdcb5ee09eaf4abb87aecf4551a23be351719f77c30",
+      "bytes": 3420
+    },
+    {
+      "path": "src/claw_eval/api/jobs.py",
+      "sha256": "38b4d57d1554efcdbc917df1b6157a6585765dcf73db9f5b5c3ad1d28944ad25",
+      "bytes": 5558
+    },
+    {
+      "path": "src/claw_eval/api/routes_config.py",
+      "sha256": "1ad4723fcd17d905d3b0fba299b07bde1564af8f232cbebbdf8a93729143e7a5",
+      "bytes": 8909
+    },
+    {
+      "path": "src/claw_eval/api/routes_meta_eval.py",
+      "sha256": "af3ed89f8afa13c9c77a4a1c98ba0c99599b62a34e6238c0c959235e92f49016",
+      "bytes": 6905
+    },
+    {
+      "path": "src/claw_eval/api/routes_personas.py",
+      "sha256": "8101cb4edaf45ed846b0b17daae2b2faf83fd0ed40034ef54a7e9bfe3ab366bd",
+      "bytes": 8196
+    },
+    {
+      "path": "src/claw_eval/api/routes_tasks.py",
+      "sha256": "8aa7ae06a7569b0c543377f1bae24e90a9264376d172f9ac392699e0183a0047",
+      "bytes": 36029
+    },
+    {
+      "path": "src/claw_eval/api/routes_tests.py",
+      "sha256": "323aa00b19574d3c71c5b14be7dc5c97f092c9701f09bac3913c304c547b4e08",
+      "bytes": 19375
+    },
+    {
+      "path": "src/claw_eval/api/routes_workflows.py",
+      "sha256": "6543149ff12095c4f9798d6ba118dbb3ccc93bdb3998988fc8700233b77919e8",
+      "bytes": 10176
+    },
+    {
+      "path": "src/claw_eval/cli.py",
+      "sha256": "2822934326de420c4ca78e3da767f70e98d5b5bdd0444f3af6b415840effcc6d",
+      "bytes": 52761
+    },
+    {
+      "path": "src/claw_eval/db/__init__.py",
+      "sha256": "b2781ae3620d8601c78da51489927c06a35d8eeff8f7ff6cdcb2b9a34a3c8cfd",
+      "bytes": 533
+    },
+    {
+      "path": "src/claw_eval/db/repo.py",
+      "sha256": "b343e41f2d2c22d2e061846b925d67a36445988052d532688b5d48242a7e8d92",
+      "bytes": 7240
+    },
+    {
+      "path": "src/claw_eval/dimensions.py",
+      "sha256": "aae5e7e6e40842d4b822f8fb34e63dc8e93699b328b0febec09f1439a8375875",
+      "bytes": 2947
+    },
+    {
+      "path": "src/claw_eval/editor/__init__.py",
+      "sha256": "c4f8f8d8cfd9ac11df59d39dd89f4ef68296c081004f5b338cfef8cc718e422c",
+      "bytes": 107
+    },
+    {
+      "path": "src/claw_eval/editor/_utils.py",
+      "sha256": "248979964fcaf5ba479c765eaecb7257238ce68f398404a9257cb209c9ccb174",
+      "bytes": 5926
+    },
+    {
+      "path": "src/claw_eval/editor/app.py",
+      "sha256": "5aad18dd1e448eb02ec11c78a85be107e721bec4e8d612cacc5bc2c9b672ecd7",
+      "bytes": 997
+    },
+    {
+      "path": "src/claw_eval/editor/dot.py",
+      "sha256": "5ad69bebd9e88bef1c86b02a252a991f87501e0f509c49f62522dac5689ad2f6",
+      "bytes": 1466
+    },
+    {
+      "path": "src/claw_eval/editor/pages/⚙️_全局配置.py",
+      "sha256": "2ffb58c9d6b0a5721513633a6eda87175bb73d82c9a7a9fbef3c22196cda96b6",
+      "bytes": 11935
+    },
+    {
+      "path": "src/claw_eval/editor/pages/📖_使用文档.py",
+      "sha256": "10e9033597d6e20ff2b3f1ea78f9a338fdb334eaf562b8bb9477ec60807615c2",
+      "bytes": 7974
+    },
+    {
+      "path": "src/claw_eval/editor/views/__init__.py",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": "src/claw_eval/editor/views/flow_dot.py",
+      "sha256": "2beb5e7dcb974cbd41f80a41db137e74061fcdecd7664541e3564ab457630552",
+      "bytes": 2436
+    },
+    {
+      "path": "src/claw_eval/editor/views/task_list.py",
+      "sha256": "3818428a48f28fde962ad171f2be24d0dcbe72acf37f125d944f2e972d1d3ac1",
+      "bytes": 10647
+    },
+    {
+      "path": "src/claw_eval/editor/views/task_overview.py",
+      "sha256": "59c920385f41a937d4310f6e91ebb92075ae845c7d26d1cceb5f620ddfbd36fd",
+      "bytes": 26330
+    },
+    {
+      "path": "src/claw_eval/editor/views/test_detail.py",
+      "sha256": "cf557b61fc8896fcbfba51667490a6706d417e04273af68c1282d2ec7583f476",
+      "bytes": 14650
+    },
+    {
+      "path": "src/claw_eval/graders/__init__.py",
+      "sha256": "eea16429455b1aa1bd6bc4b03c7979a4e53715c3a0da1bf24c0a09d71c158be7",
+      "bytes": 101
+    },
+    {
+      "path": "src/claw_eval/graders/base.py",
+      "sha256": "76180c61cff444a4cc4ff6efc1cc9a11fb94fa615c976213d66ae87a5a11203b",
+      "bytes": 6942
+    },
+    {
+      "path": "src/claw_eval/graders/llm_judge.py",
+      "sha256": "c70576fb76ff268cd8775f9e668501484d8d7021ae6b4550344fc66f6fc25742",
+      "bytes": 3415
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/__init__.py",
+      "sha256": "635e9a573f7cc079656014a66e32034b6b161d63b52c0446aeff4a23993c868a",
+      "bytes": 412
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/blacklist.py",
+      "sha256": "f4056c985c568a9d3dc69c59aea69c47f7697df47247d0ebcaca5f3bfbf052fb",
+      "bytes": 1295
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/keyword.py",
+      "sha256": "cefd0de3d67e6fda525ba4619a24633fafc15398b4f1c58a060e028a5bfbd964",
+      "bytes": 753
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/length.py",
+      "sha256": "85609d3037eb1fd5b1b3d3a2ff64aa587e1199f1e5ae05e7e42ec932bda4a310",
+      "bytes": 1119
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/number_whitelist.py",
+      "sha256": "89c8d01971d4f6345032c8ebda8fa203a4a15f406d6f61dfa1ac7ab7cec6d243",
+      "bytes": 1175
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/ordered_keyword.py",
+      "sha256": "d1fc0a514c8ba75cba7e00417fe59fc53fc0305822f3132ee08cf774862a3e61",
+      "bytes": 1116
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/pace_checker.py",
+      "sha256": "d1c975f646d163bf781e55cb82f0891e5beff60e3e8a326a41603dc000e4d2f2",
+      "bytes": 1656
+    },
+    {
+      "path": "src/claw_eval/graders/matchers/placeholder.py",
+      "sha256": "a8562621ad63dbefd3e762e40b533be57d791c0e43f7f88ce6355ab1ef193251",
+      "bytes": 1463
+    },
+    {
+      "path": "src/claw_eval/graders/registry.py",
+      "sha256": "384bf2b36dd8b1c18e96fa8777b10c44724bb9deb1b5511a510e5e38bdea3598",
+      "bytes": 1349
+    },
+    {
+      "path": "src/claw_eval/graders/rubric.py",
+      "sha256": "b29147d21c9902c6bec7a4676a091b3fce4f554c0c78b63af3ea9d7bfda48d6d",
+      "bytes": 4313
+    },
+    {
+      "path": "src/claw_eval/graders/scoring.py",
+      "sha256": "92af8be0f588157700380f3383ae13892e3ece920b252aa5c222076e9821f68e",
+      "bytes": 2069
+    },
+    {
+      "path": "src/claw_eval/graders/validation.py",
+      "sha256": "ab6e3dbec0ff561593ebc861d144d8ed096f9d35b53fbd8e976f1bccbddd510a",
+      "bytes": 2230
+    },
+    {
+      "path": "src/claw_eval/meta_eval.py",
+      "sha256": "6ee54d9bf71f95d96241f3dd430166a30e67dc8d4247acfef2509b45e75a6ea4",
+      "bytes": 13778
+    },
+    {
+      "path": "src/claw_eval/models/__init__.py",
+      "sha256": "549850a3ed944fb7bc1fe23d68209f84a203f33dd1f50d608392ab8286f9f631",
+      "bytes": 84
+    },
+    {
+      "path": "src/claw_eval/models/flow.py",
+      "sha256": "4d40ffd36dd045be5f69cad2480386dabef79ed798cac3a9922d243d6f704a4d",
+      "bytes": 1161
+    },
+    {
+      "path": "src/claw_eval/models/persona.py",
+      "sha256": "034f83e19314657998db64cb6dc0325579a343a71e14d337a557910705a61d06",
+      "bytes": 6669
+    },
+    {
+      "path": "src/claw_eval/models/rubric.py",
+      "sha256": "791b4aeea0cf97c6b3886bf22673d98dd4bd883e9c2ed668d7e5fd0e5e5ff6df",
+      "bytes": 4637
+    },
+    {
+      "path": "src/claw_eval/models/task.py",
+      "sha256": "1773220703b98411fa4b81b334c41238a367ac67a9517a59206774cab3d1d908",
+      "bytes": 1419
+    },
+    {
+      "path": "src/claw_eval/models/trace.py",
+      "sha256": "be1181328bac053481b1e2697691d73f43682a99c0a18d2198ba9eb3e7ed1ec8",
+      "bytes": 3786
+    },
+    {
+      "path": "src/claw_eval/persona_factory.py",
+      "sha256": "9717ab2f9a447529d6dd3b35169e62dfc0f3d23797bd5ac8c9310bc467896d79",
+      "bytes": 9162
+    },
+    {
+      "path": "src/claw_eval/report/__init__.py",
+      "sha256": "e3c25a8fef7b9d8c0737adbff254f2bad4c7b8ac188d7d8798ade519766f35ac",
+      "bytes": 69
+    },
+    {
+      "path": "src/claw_eval/report/aggregate.py",
+      "sha256": "bdb62caf79451482c6c77d543938e7ae190158fcd1da96a3d741939c1a6d1630",
+      "bytes": 8739
+    },
+    {
+      "path": "src/claw_eval/report/builder.py",
+      "sha256": "6af0d9efcbefea396a635107e25b35d92fc0f0fee484648188ebddf1d6f3b2a8",
+      "bytes": 15237
+    },
+    {
+      "path": "src/claw_eval/report/flow_viz.py",
+      "sha256": "277233264c3ec937ee1ce8daaf1a2dbf8ae050b4f62222f9b66a668b5ec567de",
+      "bytes": 3717
+    },
+    {
+      "path": "src/claw_eval/report/recommend.py",
+      "sha256": "1451d0ed6d762b335ffd395035d51b92c129289e7f8594c18d6b75176c98765f",
+      "bytes": 10594
+    },
+    {
+      "path": "src/claw_eval/report/regression.py",
+      "sha256": "498bf0340bc611937da12af471d42af95da86c3c4add69dcab9737666929fb54",
+      "bytes": 12661
+    },
+    {
+      "path": "src/claw_eval/report/templates/case_report.html.j2",
+      "sha256": "a5c561b14d1b425a721b0a05e9aa0a3fe907931e7779b759cd1fbda9928fa9e5",
+      "bytes": 9764
+    },
+    {
+      "path": "src/claw_eval/report/templates/dashboard.html.j2",
+      "sha256": "e246905b8f7dd18ccd14cdb5b58dcda10f8db23d5c992ce3f7ee6679dc24bab3",
+      "bytes": 13158
+    },
+    {
+      "path": "src/claw_eval/report/templates/index.html.j2",
+      "sha256": "3ab37bc368d5100f31dc590c6efff19562ef1f811246053925a60188b3a77f1a",
+      "bytes": 5292
+    },
+    {
+      "path": "src/claw_eval/report/templates/task_page.html.j2",
+      "sha256": "f62347d6b3fb7cac73ec3912a720b54f46380c964eec859f66573ee8a86f0bd8",
+      "bytes": 24093
+    },
+    {
+      "path": "src/claw_eval/rubric/__init__.py",
+      "sha256": "b34c7bbad0a6ab5116348251a867c7e747ac9b8ef00b63e4222207ddc8de3f46",
+      "bytes": 44
+    },
+    {
+      "path": "src/claw_eval/rubric/extractor.py",
+      "sha256": "1dd80c488bf70a888f5eeef9aeb1df723425c479a438af5e78918c07a9faaec4",
+      "bytes": 7495
+    },
+    {
+      "path": "src/claw_eval/rubric/reviewer.py",
+      "sha256": "cc13baedb0ecf18e13100997bbe3730dcaecad0452bf174a0edbab081763ed47",
+      "bytes": 4775
+    },
+    {
+      "path": "src/claw_eval/runner/__init__.py",
+      "sha256": "3deb0dcb93ccc376d9cca827dcd1ee00b240281c216ba6abb800be1443a34d0f",
+      "bytes": 103
+    },
+    {
+      "path": "src/claw_eval/runner/dialogue_loop.py",
+      "sha256": "15a01400c72257cc2512d7ae54bda8bd9984a3af2b761e6baa14da001003af9d",
+      "bytes": 4275
+    },
+    {
+      "path": "src/claw_eval/runner/llm_client.py",
+      "sha256": "879e242bd5a28d6ea1a490b9474ef8faf183daa569480f50289f7bebe929a922",
+      "bytes": 3105
+    },
+    {
+      "path": "src/claw_eval/runner/sut_adapter.py",
+      "sha256": "42f86d9b9a586331b1cf8f23498cebbe58aec212981047264d6649c26c5f50c9",
+      "bytes": 1893
+    },
+    {
+      "path": "src/claw_eval/runner/trace_io.py",
+      "sha256": "aa3f4a4d9de3027e7eb91faef0410443afe57ca00482d97e9df2a2dfc97bafd1",
+      "bytes": 1793
+    },
+    {
+      "path": "src/claw_eval/runs.py",
+      "sha256": "7f556e46a578fb8c554ab2676884c77957a6e2b5de9d4dd2689ba5d2f15ca193",
+      "bytes": 9280
+    },
+    {
+      "path": "src/claw_eval/sampling.py",
+      "sha256": "60f90a63242242291b2660722b860fb8f698ada7d676e4938ca972e98b1b781f",
+      "bytes": 3193
+    },
+    {
+      "path": "src/claw_eval/task_gen/__init__.py",
+      "sha256": "1ff9d6ec2b68c832db6e500d5e1b612ac7976a936219cab35296abc684de0dd4",
+      "bytes": 110
+    },
+    {
+      "path": "src/claw_eval/task_gen/apply_recommendation.py",
+      "sha256": "354ba80786802c175bac7e321884ec5386598c81d203f8598f8780560105d591",
+      "bytes": 3612
+    },
+    {
+      "path": "src/claw_eval/task_gen/config_store.py",
+      "sha256": "f9bd57fd162f3164f5fea62d5697b37f6111a42d33f1d06f19335ddbf5214a7f",
+      "bytes": 6213
+    },
+    {
+      "path": "src/claw_eval/task_gen/flow_extractor.py",
+      "sha256": "8423830f15a1181748014b175b3b2004b7f5b1efc42fa9bb640bcf6a3cc7b45f",
+      "bytes": 5144
+    },
+    {
+      "path": "src/claw_eval/task_gen/variables_extractor.py",
+      "sha256": "60fec347dc54f1f0a2f6c9773eb7bf369add82d7fa6bdd60660b4e0cd6598026",
+      "bytes": 2610
+    },
+    {
+      "path": "src/claw_eval/task_gen/versioning.py",
+      "sha256": "538a8648e593add26f664d10f4c5ba9503236fa1d751b6946e24d4c7a2f96074",
+      "bytes": 5434
+    },
+    {
+      "path": "src/claw_eval/templating.py",
+      "sha256": "32e8de47168f64a962372b578f0d07cb60cf8df7f111412ceeebf59680c7b540",
+      "bytes": 2348
+    },
+    {
+      "path": "src/claw_eval/user_simulator/__init__.py",
+      "sha256": "1dcdaf38c6571eaaf8ba53ab2626ee4cc99ea9b97ee1ddadc4388904f973c7e8",
+      "bytes": 91
+    },
+    {
+      "path": "src/claw_eval/user_simulator/extractor.py",
+      "sha256": "9875404aadcb4adf079077d006e2f41be55865341f631a3a76ee6212366daed4",
+      "bytes": 13172
+    },
+    {
+      "path": "src/claw_eval/user_simulator/probes.py",
+      "sha256": "b04a04ade09949ed40cabab56f8fd5384998234166e578ebfc905ea2eb67e47f",
+      "bytes": 537
+    },
+    {
+      "path": "src/claw_eval/user_simulator/simulator.py",
+      "sha256": "cb6cd220422211054b345706612d5a4431e9144e3217b1d0ffb9f0f7eeb7f151",
+      "bytes": 5911
+    },
+    {
+      "path": "src/claw_eval/user_simulator/state_machine.py",
+      "sha256": "0b73bd80247b8c43086cec30673e8e770e35f0c492fa7d8b02ff76f53df282c9",
+      "bytes": 2332
+    },
+    {
+      "path": "src/claw_eval/validator.py",
+      "sha256": "f5552bb69532572a083eb1ed8f65c7b95abd5d4b2a7b8bc4988461787329308d",
+      "bytes": 13332
+    },
+    {
+      "path": "tasks/live_upgrade/flow.yaml",
+      "sha256": "31b84595a4300e0e352ed665892361d5a52436a8ba6ce300ea274c47076ad3be",
+      "bytes": 1449
+    },
+    {
+      "path": "tasks/live_upgrade/personas/busy_retain.yaml",
+      "sha256": "fa71b34bd73740ce08f68618d59a7556373d58cd237d0fa61671853e7a49063e",
+      "bytes": 597
+    },
+    {
+      "path": "tasks/live_upgrade/personas/complex_setup.yaml",
+      "sha256": "bc697e0512c7496fb59d39df7ccecf9bc3f02e611cc8115d9224d33f3a903684",
+      "bytes": 489
+    },
+    {
+      "path": "tasks/live_upgrade/personas/driving_hangup.yaml",
+      "sha256": "dcc30354f2ca5bda4014dab8a7f1603f4278a98b8da336fccdf9389a77dde34e",
+      "bytes": 385
+    },
+    {
+      "path": "tasks/live_upgrade/personas/end_faq.yaml",
+      "sha256": "0ce99262f1d976dc20ceb4d7102345c2de7c465397c168ad2e8cad839a4f51b9",
+      "bytes": 617
+    },
+    {
+      "path": "tasks/live_upgrade/personas/happy_path_full.yaml",
+      "sha256": "fc02102f0224a60890d41919c41fd752f0d4e22b49ee1cb9ac83b8b9752354e4",
+      "bytes": 498
+    },
+    {
+      "path": "tasks/live_upgrade/personas/interrupt_and_unknown.yaml",
+      "sha256": "bda69a7b464a6e3f233181e038ab79ea1b1494695a0d2d5dc79584de17562abc",
+      "bytes": 708
+    },
+    {
+      "path": "tasks/live_upgrade/personas/step3_faq.yaml",
+      "sha256": "b86c8fa816bab8365e4e4f2cf2a1822e1e8cae6253eda0cb49867a9f9546593a",
+      "bytes": 586
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/busy_retain.yaml",
+      "sha256": "fa71b34bd73740ce08f68618d59a7556373d58cd237d0fa61671853e7a49063e",
+      "bytes": 597
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/complex_setup.yaml",
+      "sha256": "bc697e0512c7496fb59d39df7ccecf9bc3f02e611cc8115d9224d33f3a903684",
+      "bytes": 489
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/driving_hangup.yaml",
+      "sha256": "dcc30354f2ca5bda4014dab8a7f1603f4278a98b8da336fccdf9389a77dde34e",
+      "bytes": 385
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/end_faq.yaml",
+      "sha256": "0ce99262f1d976dc20ceb4d7102345c2de7c465397c168ad2e8cad839a4f51b9",
+      "bytes": 617
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/happy_path_full.yaml",
+      "sha256": "fc02102f0224a60890d41919c41fd752f0d4e22b49ee1cb9ac83b8b9752354e4",
+      "bytes": 498
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/interrupt_and_unknown.yaml",
+      "sha256": "bda69a7b464a6e3f233181e038ab79ea1b1494695a0d2d5dc79584de17562abc",
+      "bytes": 708
+    },
+    {
+      "path": "tasks/live_upgrade/personas_draft/step3_faq.yaml",
+      "sha256": "b86c8fa816bab8365e4e4f2cf2a1822e1e8cae6253eda0cb49867a9f9546593a",
+      "bytes": 586
+    },
+    {
+      "path": "tasks/live_upgrade/rubrics.draft.yaml",
+      "sha256": "752756e85afa2c116b5c928cee8978defaf2618b0644051f1a2f3b00d7faf8ee",
+      "bytes": 4816
+    },
+    {
+      "path": "tasks/live_upgrade/rubrics.yaml",
+      "sha256": "752756e85afa2c116b5c928cee8978defaf2618b0644051f1a2f3b00d7faf8ee",
+      "bytes": 4816
+    },
+    {
+      "path": "tasks/live_upgrade/sampling.yaml",
+      "sha256": "0bf7dedbe93b4f0794c575afb84f077958c25a91f9f919a9e6fd4b7049d37ce2",
+      "bytes": 162
+    },
+    {
+      "path": "tasks/live_upgrade/task.yaml",
+      "sha256": "448f9a71427a8acda78b45fa891a7a6354a3eb801594d5b0c13530d4a94fe8b9",
+      "bytes": 3969
+    },
+    {
+      "path": "tasks/meituan_feimaotui/flow.yaml",
+      "sha256": "8ff796b68adfbccafb9b6fba8b3a3fb28cfcac22f2a1386711006cb671a01cfb",
+      "bytes": 1164
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas/ask_contract_type_faq.yaml",
+      "sha256": "dc41a75950842ee4f5fb3820269eb921b54118d44da104bba1167776e20814b2",
+      "bytes": 703
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas/ask_exit_faq.yaml",
+      "sha256": "a0856a1cedad1f55ab36ac349a56bec29e3aa69511d8d569cf1f35eccf110722",
+      "bytes": 484
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas/ask_reward_faq.yaml",
+      "sha256": "19b412da38d75531685a4b6d6df6fe544300534d06a4a9e69e340166e22a4ba2",
+      "bytes": 501
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas/happy_path.yaml",
+      "sha256": "f16ff427f608941a61a240e4c4b300d4bf1947d9cbd221c607c702c834e05760",
+      "bytes": 374
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas/out_of_scope_question.yaml",
+      "sha256": "8dbb12c86b6cce2add7e168e6ed838744f94455744feeeb244b6ef4ea7d6bb28",
+      "bytes": 545
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas/refuse_to_deliver.yaml",
+      "sha256": "a58b7787466f0a99bf56ec67501d168405153a1a3630dcb021f0212fab7ff0c2",
+      "bytes": 687
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas_draft/ask_contract_type_faq.yaml",
+      "sha256": "dc41a75950842ee4f5fb3820269eb921b54118d44da104bba1167776e20814b2",
+      "bytes": 703
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas_draft/ask_exit_faq.yaml",
+      "sha256": "a0856a1cedad1f55ab36ac349a56bec29e3aa69511d8d569cf1f35eccf110722",
+      "bytes": 484
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas_draft/ask_reward_faq.yaml",
+      "sha256": "19b412da38d75531685a4b6d6df6fe544300534d06a4a9e69e340166e22a4ba2",
+      "bytes": 501
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas_draft/happy_path.yaml",
+      "sha256": "f16ff427f608941a61a240e4c4b300d4bf1947d9cbd221c607c702c834e05760",
+      "bytes": 374
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas_draft/out_of_scope_question.yaml",
+      "sha256": "8dbb12c86b6cce2add7e168e6ed838744f94455744feeeb244b6ef4ea7d6bb28",
+      "bytes": 545
+    },
+    {
+      "path": "tasks/meituan_feimaotui/personas_draft/refuse_to_deliver.yaml",
+      "sha256": "a58b7787466f0a99bf56ec67501d168405153a1a3630dcb021f0212fab7ff0c2",
+      "bytes": 687
+    },
+    {
+      "path": "tasks/meituan_feimaotui/rubrics.draft.yaml",
+      "sha256": "3c11d53603f38ceb9c4bc58433f14df68a88751d902b228ad0631c99d71e5f3e",
+      "bytes": 5482
+    },
+    {
+      "path": "tasks/meituan_feimaotui/rubrics.yaml",
+      "sha256": "1130a411ee58b735e10804ba68b042aec3348bbede2bf212c4d1c2af5a8a0eba",
+      "bytes": 5536
+    },
+    {
+      "path": "tasks/meituan_feimaotui/sampling.yaml",
+      "sha256": "b9dd814337690c46a0f1f5e9cbc9f5712bdc08eb5135d1e38b4250113bd586f4",
+      "bytes": 158
+    },
+    {
+      "path": "tasks/meituan_feimaotui/task.yaml",
+      "sha256": "848e9466bcbafce457e457f8662ea2882b06885ce48892de755baec7b5abe269",
+      "bytes": 2192
+    },
+    {
+      "path": "tasks/meituan_rider_contract/flow.yaml",
+      "sha256": "6b3527af7f60dc975299e6ea7f97f444503620c569f577b77540d614517508e1",
+      "bytes": 1645
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/ask_exit_rule.yaml",
+      "sha256": "bf1ebfb5652e31210ac84caa3f7eaff20be86a3d57410236437e2e643db5d9db",
+      "bytes": 494
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/ask_multi_day.yaml",
+      "sha256": "bb833f23aaf47b5a6818e7b30bc8e9e593009a77b072227433a403669ca9a3bd",
+      "bytes": 494
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/ask_quota_risk.yaml",
+      "sha256": "dddfbded1925ab42f36322e42c95c651b93406a3484949714a82689d3c0f1018",
+      "bytes": 543
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/ask_reward.yaml",
+      "sha256": "208a37370c4969535fb3fc18b749aac863f80b2ec61e3abfe91f80ec116731e2",
+      "bytes": 503
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/ask_single_day.yaml",
+      "sha256": "6cfabec8b0ef8a072f112e0b1bcfd61e0d5909006dd45c29a597d7af54698f03",
+      "bytes": 513
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/happy_path.yaml",
+      "sha256": "d36c33e9247c40968961557813d71dd6ebe0cc6fa926cb65e3fcddf05d5351c5",
+      "bytes": 416
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/out_of_scope_question.yaml",
+      "sha256": "c06d20a9981e2fec7ed7c3b73db5c87f2088a7e00c8e2d74b62cf0b12dcea701",
+      "bytes": 596
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas/refuse_midway.yaml",
+      "sha256": "4f71107bcd7f8b4d94326a6ce29c0fe7e6c01ede1a2831dc010c4d529fe320ae",
+      "bytes": 624
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/ask_exit_rule.yaml",
+      "sha256": "bf1ebfb5652e31210ac84caa3f7eaff20be86a3d57410236437e2e643db5d9db",
+      "bytes": 494
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/ask_multi_day.yaml",
+      "sha256": "bb833f23aaf47b5a6818e7b30bc8e9e593009a77b072227433a403669ca9a3bd",
+      "bytes": 494
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/ask_quota_risk.yaml",
+      "sha256": "dddfbded1925ab42f36322e42c95c651b93406a3484949714a82689d3c0f1018",
+      "bytes": 543
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/ask_reward.yaml",
+      "sha256": "208a37370c4969535fb3fc18b749aac863f80b2ec61e3abfe91f80ec116731e2",
+      "bytes": 503
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/ask_single_day.yaml",
+      "sha256": "6cfabec8b0ef8a072f112e0b1bcfd61e0d5909006dd45c29a597d7af54698f03",
+      "bytes": 513
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/happy_path.yaml",
+      "sha256": "d36c33e9247c40968961557813d71dd6ebe0cc6fa926cb65e3fcddf05d5351c5",
+      "bytes": 416
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/out_of_scope_question.yaml",
+      "sha256": "c06d20a9981e2fec7ed7c3b73db5c87f2088a7e00c8e2d74b62cf0b12dcea701",
+      "bytes": 596
+    },
+    {
+      "path": "tasks/meituan_rider_contract/personas_draft/refuse_midway.yaml",
+      "sha256": "4f71107bcd7f8b4d94326a6ce29c0fe7e6c01ede1a2831dc010c4d529fe320ae",
+      "bytes": 624
+    },
+    {
+      "path": "tasks/meituan_rider_contract/rubrics.draft.yaml",
+      "sha256": "d0baebadbd4bb996177e030da183f8bae13b6f40aac95a5ade168d7a67c6a1e2",
+      "bytes": 5228
+    },
+    {
+      "path": "tasks/meituan_rider_contract/rubrics.yaml",
+      "sha256": "d0baebadbd4bb996177e030da183f8bae13b6f40aac95a5ade168d7a67c6a1e2",
+      "bytes": 5228
+    },
+    {
+      "path": "tasks/meituan_rider_contract/sampling.yaml",
+      "sha256": "15fa3312e11665ad4645e1cff7cb87a4328210b200707089ddffd75feac91846",
+      "bytes": 189
+    },
+    {
+      "path": "tasks/meituan_rider_contract/task.yaml",
+      "sha256": "54477d0789698854ffd84a474b7dfc1789d96a25f4d44f4840db01984037e106",
+      "bytes": 2211
+    },
+    {
+      "path": "tasks/new_task/flow.yaml",
+      "sha256": "a0baae9178a6430f1c2634fbf78a8d36dba0bd7c21b6620189decc284780cfb4",
+      "bytes": 1130
+    },
+    {
+      "path": "tasks/new_task/personas/ask_contract_detail.yaml",
+      "sha256": "e3c1bc6b5f5e2376a0a3a6febdf7bc5e4d61243eeb3f83b7a6fd08586ca19cf5",
+      "bytes": 622
+    },
+    {
+      "path": "tasks/new_task/personas/ask_exit_rule.yaml",
+      "sha256": "ede80b6d1c1ab1127c635b46bde2509223ef54063cc06dac41b3ca9022dfde67",
+      "bytes": 582
+    },
+    {
+      "path": "tasks/new_task/personas/ask_out_of_scope.yaml",
+      "sha256": "fa1f82a019a7cc7fe6d41087fc6d83a073316a3c862f3463750c2295ea0dc727",
+      "bytes": 626
+    },
+    {
+      "path": "tasks/new_task/personas/happy_path.yaml",
+      "sha256": "9c74e5798ae0e284aabe86a8ec4113e1288a36145c88e7ce5cd3ae4a1dfc5891",
+      "bytes": 473
+    },
+    {
+      "path": "tasks/new_task/personas/refuse_to_deliver.yaml",
+      "sha256": "2fe0bf22befce2a3e9d634fe311d9b31cb7d8d316a626a3e5443779773d63c6f",
+      "bytes": 707
+    },
+    {
+      "path": "tasks/new_task/personas_draft/ask_contract_detail.yaml",
+      "sha256": "e3c1bc6b5f5e2376a0a3a6febdf7bc5e4d61243eeb3f83b7a6fd08586ca19cf5",
+      "bytes": 622
+    },
+    {
+      "path": "tasks/new_task/personas_draft/ask_exit_rule.yaml",
+      "sha256": "ede80b6d1c1ab1127c635b46bde2509223ef54063cc06dac41b3ca9022dfde67",
+      "bytes": 582
+    },
+    {
+      "path": "tasks/new_task/personas_draft/ask_out_of_scope.yaml",
+      "sha256": "fa1f82a019a7cc7fe6d41087fc6d83a073316a3c862f3463750c2295ea0dc727",
+      "bytes": 626
+    },
+    {
+      "path": "tasks/new_task/personas_draft/happy_path.yaml",
+      "sha256": "9c74e5798ae0e284aabe86a8ec4113e1288a36145c88e7ce5cd3ae4a1dfc5891",
+      "bytes": 473
+    },
+    {
+      "path": "tasks/new_task/personas_draft/refuse_to_deliver.yaml",
+      "sha256": "2fe0bf22befce2a3e9d634fe311d9b31cb7d8d316a626a3e5443779773d63c6f",
+      "bytes": 707
+    },
+    {
+      "path": "tasks/new_task/rubrics.draft.yaml",
+      "sha256": "83bcb77dbc6d97bc6e434aa7e411f7f04f80cfa1221edf70741ddb6171debfff",
+      "bytes": 4244
+    },
+    {
+      "path": "tasks/new_task/rubrics.yaml",
+      "sha256": "83bcb77dbc6d97bc6e434aa7e411f7f04f80cfa1221edf70741ddb6171debfff",
+      "bytes": 4244
+    },
+    {
+      "path": "tasks/new_task/sampling.yaml",
+      "sha256": "f19b668d43cc5cf2fa51927934c3de42316b9bfa5250b717a3f24b527383c210",
+      "bytes": 129
+    },
+    {
+      "path": "tasks/new_task/task.yaml",
+      "sha256": "ce9d216f8437e1ecaf9344b5e8a86c47b45769c930c6e539b93e906165b66012",
+      "bytes": 2113
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/flow.yaml",
+      "sha256": "3542887e17bba3950d5ea75f4eea23d11ed2329daa9e60c66d1c07e5a6a1480a",
+      "bytes": 1162
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas/ask_bonus_rule_end.yaml",
+      "sha256": "9b8919e7f00f271444264e101e14a47ebe90ff049367b67325e474a4d2980388",
+      "bytes": 544
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas/ask_exit_rule_midway.yaml",
+      "sha256": "24ebe7612f42bf14f0c8464c1e61f16012e7ea92aa8e7e2a31e8c62cdfb9d090",
+      "bytes": 531
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas/ask_out_of_scope.yaml",
+      "sha256": "efbd97b5b5a59ff384ce5789dee67461c67c2d8361161234a239df462eb339be",
+      "bytes": 585
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas/ask_slots_rule_midway.yaml",
+      "sha256": "bacfb5c70551fee65f5c5344060940d94317339a35a076dc6d8d5a06885fc323",
+      "bytes": 571
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas/happy_path.yaml",
+      "sha256": "a9721c78c1f1b1446977ee1a6ffdad64752e7d4f972a79b7df5cc2f18c85c282",
+      "bytes": 426
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas/refuse_midway.yaml",
+      "sha256": "056726f6dafa6715c3c2c28f2db803045bd9d212a8c01518d63fe566e87e5541",
+      "bytes": 544
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas_draft/ask_bonus_rule_end.yaml",
+      "sha256": "9b8919e7f00f271444264e101e14a47ebe90ff049367b67325e474a4d2980388",
+      "bytes": 544
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas_draft/ask_exit_rule_midway.yaml",
+      "sha256": "24ebe7612f42bf14f0c8464c1e61f16012e7ea92aa8e7e2a31e8c62cdfb9d090",
+      "bytes": 531
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas_draft/ask_out_of_scope.yaml",
+      "sha256": "efbd97b5b5a59ff384ce5789dee67461c67c2d8361161234a239df462eb339be",
+      "bytes": 585
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas_draft/ask_slots_rule_midway.yaml",
+      "sha256": "bacfb5c70551fee65f5c5344060940d94317339a35a076dc6d8d5a06885fc323",
+      "bytes": 571
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas_draft/happy_path.yaml",
+      "sha256": "a9721c78c1f1b1446977ee1a6ffdad64752e7d4f972a79b7df5cc2f18c85c282",
+      "bytes": 426
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/personas_draft/refuse_midway.yaml",
+      "sha256": "056726f6dafa6715c3c2c28f2db803045bd9d212a8c01518d63fe566e87e5541",
+      "bytes": 544
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/rubrics.draft.yaml",
+      "sha256": "4d55aac490f7f8d73c0b6d02a5914eb833152824bd42ad659c96fb063043d411",
+      "bytes": 5393
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/rubrics.yaml",
+      "sha256": "297793953bd315717fe22eecd39a96b2a001acdc1694e97ab1fd572cc08d0c09",
+      "bytes": 5362
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/sampling.yaml",
+      "sha256": "58c0ed1bb9dd381105773a8be7e1afc420031dd3dd81ef216c0b37dec5d8da5f",
+      "bytes": 161
+    },
+    {
+      "path": "tasks/rider_delivery_demo_0904/task.yaml",
+      "sha256": "bc48b27ea523563e29fe3ed499c35432e2a35aa8a5c573157f26ebcd1edeead6",
+      "bytes": 2318
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/flow.yaml",
+      "sha256": "e862c797981a0c0fcb63f34ae02cb6cda6e26c3a4fd764208855604363474e8c",
+      "bytes": 1505
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/grader.py",
+      "sha256": "1bc2e32e44f4be9a568adf7ba47afd33cf800b99f14fb27e82f1195bfbaeffaf",
+      "bytes": 3397
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/adv_injection_rider.yaml",
+      "sha256": "bc252610e13e6464e28541f0e9a11addfbaec783b8e49f91e06ecbf132e3af84",
+      "bytes": 955
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/adv_pressure_for_perk.yaml",
+      "sha256": "3b752585e86f37ee5ff0520253b97921e649d511597bdf970d69a61be92b8167",
+      "bytes": 949
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/argumentative.yaml",
+      "sha256": "e9376d6388004448b0582d741235327f59ddd9461e90ac3c489e2b027a4fed0c",
+      "bytes": 840
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/cooperative.yaml",
+      "sha256": "d915c7b1cd775d0a3d686be1822e382f9376b184a43c025a4a07b3d931139fd5",
+      "bytes": 651
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/hesitant.yaml",
+      "sha256": "d02005d4532ee367227c180546abc1c403ee844d437e177fe12fae60fea1f675",
+      "bytes": 1180
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/info_missing.yaml",
+      "sha256": "faf30e378da1a8308468dbf225e2d0ccd922197779be8789828b2c98884940f8",
+      "bytes": 815
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/out_of_scope.yaml",
+      "sha256": "55fd41ee172a4a17201c86308e34307863ef85757d758530035952be5f67a5fc",
+      "bytes": 910
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/personas/refuse.yaml",
+      "sha256": "ec37720d231fee6fd0b8dbeded50933b35238dda118c21bd414b73344fe6313b",
+      "bytes": 818
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/rubrics.yaml",
+      "sha256": "d845e44bbe8003623f07a48cfc19e9eb50567db323557cd2946aabe562105877",
+      "bytes": 6525
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/sampling.yaml",
+      "sha256": "bf0f4f622a471caaffe1d7724e3f6f62dfc14741d9c2f37b977317f03d8eb2ee",
+      "bytes": 368
+    },
+    {
+      "path": "tests/fixtures/meituan_rider_task/task.yaml",
+      "sha256": "a7072fef953e52a5c3b3b0d823d5dd6ba45b23bbbd93a296418f595405eff316",
+      "bytes": 2655
+    },
+    {
+      "path": "tests/fixtures/personas_v1/cooperative.yaml",
+      "sha256": "d915c7b1cd775d0a3d686be1822e382f9376b184a43c025a4a07b3d931139fd5",
+      "bytes": 651
+    },
+    {
+      "path": "tests/fixtures/personas_v1/cooperative_owner.yaml",
+      "sha256": "3f27961df1d5579d16584b6568f0667a5fba23c7814567ce6b6eb6ce6eb992be",
+      "bytes": 817
+    },
+    {
+      "path": "tests/fixtures/personas_v1/refuse.yaml",
+      "sha256": "ec37720d231fee6fd0b8dbeded50933b35238dda118c21bd414b73344fe6313b",
+      "bytes": 818
+    },
+    {
+      "path": "tests/test_adversarial.py",
+      "sha256": "356e6c844f11a70695ba5cfe093d89ca79e97a0e52a9cc509d126de5ef959142",
+      "bytes": 6300
+    },
+    {
+      "path": "tests/test_aggregate.py",
+      "sha256": "6a291ddcd6fe231384139a65ef1698417e85fb455fb8c2433f5e51959198a13a",
+      "bytes": 4638
+    },
+    {
+      "path": "tests/test_api_review_workflow.py",
+      "sha256": "ff332e549584f9b3fe03393ab5ffe09d99e28372a3d449d1481067edfcfe4cd1",
+      "bytes": 6346
+    },
+    {
+      "path": "tests/test_apply_recommendation.py",
+      "sha256": "ee641a71f70cd8aa3906913004cef552c1894af1f4c4dc08ba60b7ccb661b84c",
+      "bytes": 2974
+    },
+    {
+      "path": "tests/test_browser_workflows.py",
+      "sha256": "d9cc96161a633ef20330b3caa785b9899a79b75ac2d7085fa30f1a914027bc87",
+      "bytes": 10974
+    },
+    {
+      "path": "tests/test_db.py",
+      "sha256": "c212dab3616a9579cf1988f2c58c7213f917110179e0170540205e273ded8d04",
+      "bytes": 3465
+    },
+    {
+      "path": "tests/test_dialogue_lifecycle.py",
+      "sha256": "5e65ca6c6611ea5717346e64feef99c6390cd9632c453f1b2c0e1cfd9aa34e2b",
+      "bytes": 2196
+    },
+    {
+      "path": "tests/test_durable_jobs.py",
+      "sha256": "f567f89b6b907ca459c29d3e8d4a0dffc499245e4fcc15b83cfe4aaf50e97590",
+      "bytes": 4538
+    },
+    {
+      "path": "tests/test_editor.py",
+      "sha256": "ef370d2530ecc60c850fce2d57d1150b8781b2fa55bf97ada96c7361473d30d4",
+      "bytes": 2171
+    },
+    {
+      "path": "tests/test_feature_completion.py",
+      "sha256": "0b8f75b6594fb1b9bbe61b70816e56966e39fc0c1cac2e36cd4d2e6851c5cfc4",
+      "bytes": 22579
+    },
+    {
+      "path": "tests/test_flow.py",
+      "sha256": "df32497675b07b65f269ff1d00f4672ccd89cf2684910f020947040426f5f00e",
+      "bytes": 4228
+    },
+    {
+      "path": "tests/test_matchers.py",
+      "sha256": "b7104f9a68cdcd64bb902f3be9e89a9a6c948d740f63fec074cb04ad6c4e47c6",
+      "bytes": 3958
+    },
+    {
+      "path": "tests/test_meituan_grader.py",
+      "sha256": "13d998e67b9dfffd0a90c85353217c7781aedbdc9632ec51056477a59f6b8863",
+      "bytes": 5197
+    },
+    {
+      "path": "tests/test_meta_eval.py",
+      "sha256": "94128ab4a06e8324785b75f68ff177e8a7bdbcdd0146702a897f47f629d37ec1",
+      "bytes": 6041
+    },
+    {
+      "path": "tests/test_new_matchers.py",
+      "sha256": "ec34392a941099c0b910456804759c60dd4be0fe7b7e3f07470bfcfee1442cc5",
+      "bytes": 3699
+    },
+    {
+      "path": "tests/test_noise_overlay.py",
+      "sha256": "41c4100c140d479a4f881c3ffb50c3a795cce15b0bf3925aed8a57e335ac4bdc",
+      "bytes": 3020
+    },
+    {
+      "path": "tests/test_persona_extractor.py",
+      "sha256": "5a3ca500a772ed4a024816ecbd51e893840d847e73e607fd53ff2a7b3f88d21f",
+      "bytes": 7300
+    },
+    {
+      "path": "tests/test_personas.py",
+      "sha256": "fecb326e60d33b26369fef568bb3f006bda791873ed72f1d85ea1ac028edfe31",
+      "bytes": 6240
+    },
+    {
+      "path": "tests/test_recommend.py",
+      "sha256": "850535f4b96dc9bf9b80ee79592565c798abb0acad5270073be7557784e1777c",
+      "bytes": 7629
+    },
+    {
+      "path": "tests/test_regression.py",
+      "sha256": "242dbd9857e27e2049bbf2fda6bca67c866b57d9ff19287f3034a1360a4e3523",
+      "bytes": 7546
+    },
+    {
+      "path": "tests/test_report.py",
+      "sha256": "3ccb220afe74de2c5fbe3ac39ddca2ec1362b6ea1aad3c21f4504697edf9d8ec",
+      "bytes": 10633
+    },
+    {
+      "path": "tests/test_rubric_extractor.py",
+      "sha256": "7e29f7e3b1ceb024d1dc5b351dd14f43080ad09ec3a49822891afbad23b2d175",
+      "bytes": 4259
+    },
+    {
+      "path": "tests/test_rubric_reviewer.py",
+      "sha256": "08fe2a046848041e88005f32d855d069afa96f8c133e5569297860145955065b",
+      "bytes": 4590
+    },
+    {
+      "path": "tests/test_run_integrity.py",
+      "sha256": "5b88bbef31f4c3245944813ea547f8e683eeaddf5fcfd492c097b2cf90a3a3b2",
+      "bytes": 13010
+    },
+    {
+      "path": "tests/test_sampling.py",
+      "sha256": "333f6b7a6ca77bbae772749da7d8db2e9a8f796b1ffe96daa0ebba15519648d1",
+      "bytes": 2617
+    },
+    {
+      "path": "tests/test_scoring.py",
+      "sha256": "55a41739249fcbe4dad70f30c919e06405ab42e2340f88ba4af56cd684283c6a",
+      "bytes": 2500
+    },
+    {
+      "path": "tests/test_state_machine_probabilistic.py",
+      "sha256": "d53a68754d4c330a2b94dfaffce87edec8dffc478da2451b58c4ef788069e07f",
+      "bytes": 4786
+    },
+    {
+      "path": "tests/test_task_gen.py",
+      "sha256": "c7ed65612c8e2bf6c98f37e3e79d99a18ba2fae2d1ef3017875acdfd514ede49",
+      "bytes": 4759
+    },
+    {
+      "path": "tests/test_templating.py",
+      "sha256": "7eee6341a02a2cf85b099cf7b2cc95a398c0e67748767ef8ac04812231d3a146",
+      "bytes": 1625
+    },
+    {
+      "path": "tests/test_validator.py",
+      "sha256": "1fa5f03396ea160442b552812efffc3d91ff58e8526d6b07db366c79b32e6d15",
+      "bytes": 7329
+    },
+    {
+      "path": "tests/test_versioning.py",
+      "sha256": "418998fcce6a1e83fac57b1e7e5f7d111007db5a8e8f77b0fb5871c48b4a0ab2",
+      "bytes": 2926
+    },
+    {
+      "path": "web/README.md",
+      "sha256": "d54381ab2ffea178405b6681f3cc88956d280a3669221669791914fc4c8a8cd3",
+      "bytes": 1965
+    },
+    {
+      "path": "web/dist-gh/assets/index-B37ZKbON.css",
+      "sha256": "4f743ff6dd00daec225166611f194b402f49f1706b42ac5360305d356a70dd55",
+      "bytes": 18940
+    },
+    {
+      "path": "web/dist-gh/assets/index-CGEQcaug.js",
+      "sha256": "6fbce40da42ebf7902d5164391e943e1cae657ec9d526d40821c8f545a2b9283",
+      "bytes": 658647
+    },
+    {
+      "path": "web/dist-gh/index.html",
+      "sha256": "4b5ae2d02a4f0f0fafdb323125cd914525548cef4159c9201b4ab7b605750f50",
+      "bytes": 525
+    },
+    {
+      "path": "web/index.html",
+      "sha256": "916756670bc8f3c35106c404b1ebfe1cb845b8797f41632a905febcf06ee4115",
+      "bytes": 405
+    },
+    {
+      "path": "web/package-lock.json",
+      "sha256": "93815f48348cce219e8e347b0e84a1b69569ea01b5936bc78bf021bfe93c3554",
+      "bytes": 119590
+    },
+    {
+      "path": "web/package.json",
+      "sha256": "b1caec896e1c58e4645e5c2dffd933e7d60941570e12e66ad54df614551a7322",
+      "bytes": 899
+    },
+    {
+      "path": "web/postcss.config.js",
+      "sha256": "190c877db466995bf1482f4a16abd06e04a89ede3119341e2a86ff96e1737b27",
+      "bytes": 80
+    },
+    {
+      "path": "web/src/App.tsx",
+      "sha256": "f48940ffe1529fb41ac64fdb33269375d0a3a1921d4280b672dcc0b93d6d48c8",
+      "bytes": 3842
+    },
+    {
+      "path": "web/src/components/AgentChat.tsx",
+      "sha256": "ba2864faa2bb130648bc13201cbb05285d2886fb827abf0e6aece0985649aed6",
+      "bytes": 5068
+    },
+    {
+      "path": "web/src/components/EvaluationWorkflow.tsx",
+      "sha256": "a9e36f479524f744024bf6203dc762b540a3a4bd7bcfdba88e22b33edf4e9c3a",
+      "bytes": 16366
+    },
+    {
+      "path": "web/src/components/FlowGraph.tsx",
+      "sha256": "9cdd80886b9ee5dd6c5eb3358f262ee203fe5af083d62622bf1237f04098f3de",
+      "bytes": 4826
+    },
+    {
+      "path": "web/src/components/NewTestForm.tsx",
+      "sha256": "868e4492266f77db41dabefe7dd15a76ac529fb5cf7f020a4715856f64043d4d",
+      "bytes": 18517
+    },
+    {
+      "path": "web/src/components/ScriptList.tsx",
+      "sha256": "121e677bb3728824602ccfe0a123ef4ba868a8f1a2a794188d0ac0b3f940999a",
+      "bytes": 8271
+    },
+    {
+      "path": "web/src/components/TaskConfig.tsx",
+      "sha256": "e0f9cc4cacb5f51eea7d7d44fc73cc3fda5640bdd1c781ead96901778a8a7c29",
+      "bytes": 18950
+    },
+    {
+      "path": "web/src/components/ui/Badge.tsx",
+      "sha256": "42929fe435d078ef942dd6356fc9c37c76ce94557aa1295c1677128e11f7cb0b",
+      "bytes": 884
+    },
+    {
+      "path": "web/src/components/ui/Button.tsx",
+      "sha256": "d30659ffe6a58ac338e1adaf45e7bd59a31ec9db95e22a86ae7d33f1092c6443",
+      "bytes": 1271
+    },
+    {
+      "path": "web/src/components/ui/Card.tsx",
+      "sha256": "1ab3be1e45723b041b529736e64da3da04e7030e7b329e05a2b54ce305f31e03",
+      "bytes": 903
+    },
+    {
+      "path": "web/src/components/ui/Progress.tsx",
+      "sha256": "31a7d1d28a7070a02e36a0efea95e5f436f315fd248daa76cb00c292c9766c0b",
+      "bytes": 1455
+    },
+    {
+      "path": "web/src/index.css",
+      "sha256": "c6ea28c511c09c7956bf542563bd607bcb53dc7f5ac3ba89c5dd3c9208c98f50",
+      "bytes": 1554
+    },
+    {
+      "path": "web/src/lib/api.ts",
+      "sha256": "79e11395f594e4906ae416f92622e5d44b68a36d627f274232cb9566ab0092ee",
+      "bytes": 10592
+    },
+    {
+      "path": "web/src/lib/cn.ts",
+      "sha256": "e46429536f43f5910f5b2b0c50bb2769b510a4558bb4b5d20a3b0a9091dbf7c3",
+      "bytes": 166
+    },
+    {
+      "path": "web/src/lib/jobs.ts",
+      "sha256": "53854005b0323d3a753e9836d5bfa030f892c154bbcf727067daaa0cc6e21d86",
+      "bytes": 2769
+    },
+    {
+      "path": "web/src/lib/mockData.ts",
+      "sha256": "3dbf776978268cc211f0cbe19b6dcd2689d2a934bbc30e655afa01ea93e8740b",
+      "bytes": 11080
+    },
+    {
+      "path": "web/src/main.tsx",
+      "sha256": "51c00c2215e597acd281c3a270beda949629b2b790ff3cc48f22579769c647a0",
+      "bytes": 646
+    },
+    {
+      "path": "web/src/pages/Docs.tsx",
+      "sha256": "c66b569e5036e67d575618e1796eef6903346fd0ecb4b7c9e3e532901498f984",
+      "bytes": 3602
+    },
+    {
+      "path": "web/src/pages/MetaEval.tsx",
+      "sha256": "70d9524c68668a37aa895076bb917d1e2dff5cb4985f5273b336b8424ad50725",
+      "bytes": 13893
+    },
+    {
+      "path": "web/src/pages/Settings.tsx",
+      "sha256": "0766e2c634ccc1f9b5f5c6736530e390f8a84c589b0ca283965be4f5c581cac8",
+      "bytes": 27895
+    },
+    {
+      "path": "web/src/pages/TaskList.tsx",
+      "sha256": "e16e806772d5b5e35ec914b2c2bf5537f3931529ab7a8aac26df6a1e12b7e18d",
+      "bytes": 16661
+    },
+    {
+      "path": "web/src/pages/TaskOverview.tsx",
+      "sha256": "9dd601e0bd2a4a59e5e6d9fddd868a60d882bd28708d567a294b92942193b537",
+      "bytes": 11331
+    },
+    {
+      "path": "web/src/pages/TestDetail.tsx",
+      "sha256": "c0d31612001a6417e5f5b8587487e0418eee758686f1c5b49dcf9b8cf8e5cbed",
+      "bytes": 18565
+    },
+    {
+      "path": "web/src/vite-env.d.ts",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
+      "bytes": 38
+    },
+    {
+      "path": "web/tailwind.config.js",
+      "sha256": "710df2b4b514e8816e1f9ef6016e2da6110370955d07c51e0d285f327f702d33",
+      "bytes": 1216
+    },
+    {
+      "path": "web/tests/api.test.mjs",
+      "sha256": "19e061825ee32c9d1cf4a30ab47d7fd8181e24a536dcfce35e20d047423d5e24",
+      "bytes": 3214
+    },
+    {
+      "path": "web/tsconfig.json",
+      "sha256": "0e723d6fb0723c0007956cea808e64a06d78908703e7b5390542ad1ed2087aaa",
+      "bytes": 595
+    },
+    {
+      "path": "web/vite.config.ts",
+      "sha256": "0ba377a4ab72a18de5c96c07b68dd51881eaa94a250676ad8fc91e062abca8dc",
+      "bytes": 485
+    },
+    {
+      "path": "方案设计.md",
+      "sha256": "14d2db77618650a69fc081044e0c4ea2cb0dc4068e07b6d2a21291af1d774369",
+      "bytes": 13300
+    },
+    {
+      "path": "方案设计_直播升级外呼.md",
+      "sha256": "576f5ef1e5b4918482bb0cb70712204105d6f4eef8ea735e0f24de93eea6bab7",
+      "bytes": 14661
+    }
+  ],
+  "excluded": [],
+  "original_head": "a62430aff29c546baf006860b7c05b29a47040dc",
+  "original_branch": "main",
+  "kind": "workspace snapshot, not a build/runtime/database backup",
+  "validation": "secret scan and file hashes only; existing application changes not functionally validated here"
+}

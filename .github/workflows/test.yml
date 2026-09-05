@@ -1,0 +1,71 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Run pytest
+        run: pytest -q
+
+      - name: Smoke check CLI loads
+        run: PYTHONPATH=src python3 -m claw_eval.cli --help
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Test frontend
+        working-directory: web
+        run: npm test
+
+      - name: Build frontend
+        working-directory: web
+        run: npm run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install browser acceptance dependencies
+        run: |
+          pip install -e '.[dev,web,browser]'
+          python -m playwright install --with-deps chromium
+
+      - name: Test browser workflows with offline models
+        env:
+          EVAL_BROWSER: '1'
+        run: python -m pytest -q tests/test_browser_workflows.py

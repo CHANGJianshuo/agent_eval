@@ -1,0 +1,26 @@
+id: refuse_to_deliver
+name: 中途明确拒绝配送
+scenario: '你是骑手王小明。在对方完成合同和连续要求说明后，站长对你进行挽留和鼓励，
+
+  你明确表示今天确实有急事无法上线，即使对方再劝说你也坚持无法配送，
+
+  站长最终安抚你并挂断电话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- unable_retain_end
+- end
+probes:
+- id: trigger_refusal
+  inject_at_turn: 2
+  text: 我今天不太想跑了，能不能不送？
+  description: 触发挽留与鼓励
+- id: trigger_insist_refusal
+  inject_at_turn: 3
+  text: 我今天确实有急事，真的没法配送。
+  description: 触发安慰后结束通话
+max_rounds: 7

@@ -1,0 +1,8 @@
+weights:
+  happy_path_full: 10.0
+  busy_retain: 10.0
+  driving_hangup: 10.0
+  interrupt_and_unknown: 10.0
+  step3_faq: 10.0
+  complex_setup: 10.0
+  end_faq: 10.0

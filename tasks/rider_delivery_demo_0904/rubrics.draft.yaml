@@ -1,0 +1,204 @@
+rubrics:
+- id: opening.greeting
+  dimension: completion
+  method: keyword
+  check: 开场白必须包含「骑手」「站长」「飞毛腿」「20」「15」和「能配送」
+  weight: 0.08
+  params:
+    scope: first_assistant
+    keywords:
+    - 骑手
+    - 站长
+    - 飞毛腿
+    - '20'
+    - '15'
+    - 能配送
+    mode: all
+  category: opening
+  confidence: 0.9
+- id: flow.step1_contract_effective
+  dimension: completion
+  method: llm_judge
+  check: 站长是否告知骑手今天飞毛腿合同已生效，并询问是否可以开始配送
+  weight: 0.1
+  category: flow
+  confidence: 0.88
+- id: flow.step2_consecutive_days
+  dimension: completion
+  method: llm_judge
+  check: 站长是否说明多日飞毛腿合同需要连续 {W} 天完成配送，否则合同将受到影响
+  weight: 0.1
+  category: flow
+  confidence: 0.88
+- id: flow.step3_retain_encourage_safety
+  dimension: completion
+  method: llm_judge
+  check: 站长是否尽量挽留不想配送的骑手，鼓励能配送的骑手，并提醒注意安全
+  weight: 0.1
+  category: flow
+  confidence: 0.85
+- id: flow.step4_ranking_not_intervention
+  dimension: completion
+  method: llm_judge
+  check: 站长是否说明飞毛腿报名按排名进行，非站长干预，并提醒减少拒单、取消和超时，恶劣天气有助于保住资格
+  weight: 0.1
+  category: flow
+  confidence: 0.82
+- id: faq.many_applicants_spot_occupied
+  dimension: completion
+  method: llm_judge
+  check: 当骑手表示无法连续配送或担心名额时，站长是否提及目前许多骑手申请飞毛腿，若无法连续 {W} 天，名额可能被他人占用
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户提到名额/不送/退出/连续
+    keywords:
+    - 名额
+    - 不送
+    - 退出
+    - 连续
+  category: faq
+  confidence: 0.85
+- id: faq.single_day_contract
+  dimension: completion
+  method: llm_judge
+  check: 当骑手询问单日合同时，站长是否说明生效当天必须完成 {X} 单，否则合同及派单可能受影响
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户问单日合同要求
+    keywords:
+    - 单日
+    - 今天
+    - 20单
+    - 完成多少
+  category: faq
+  confidence: 0.85
+- id: faq.multi_day_contract
+  dimension: completion
+  method: llm_judge
+  check: 当骑手询问多日合同时，站长是否说明每天必须完成 {Y} 单，否则后续合同及派单可能受影响
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户问多日合同要求
+    keywords:
+    - 多日
+    - 每天
+    - 15单
+    - 完成多少
+  category: faq
+  confidence: 0.85
+- id: faq.exit_rule
+  dimension: completion
+  method: llm_judge
+  check: 当骑手询问退出时，站长是否说明必须前一天 {Z} 点前在 App 飞毛腿报名中取消，次日生效
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户问退出
+    keywords:
+    - 退出
+    - 不干
+    - 取消
+  category: faq
+  confidence: 0.88
+- id: faq.bonus_reward
+  dimension: completion
+  method: llm_judge
+  check: 当骑手询问奖励时，站长是否说明连续完成 {W} 天多日合同且每天完成 {Y} 单，每单多 {bonus} 元
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户问奖励
+    keywords:
+    - 奖励
+    - 奖金
+    - 额外
+    - 每单多
+  category: faq
+  confidence: 0.85
+- id: constraint.length_50
+  dimension: robustness
+  method: length
+  check: 每轮回复不超过 50 个字符
+  weight: 0.2
+  params:
+    max_chars: 50
+    tolerance: 0
+  category: constraint
+  confidence: 0.99
+- id: constraint.one_info_per_turn
+  dimension: completion
+  method: llm_judge
+  check: 每轮只表达一个信息点，没有把多个流程步骤或 FAQ 合并在同一轮
+  weight: 0.15
+  category: constraint
+  confidence: 0.8
+- id: constraint.no_repeat
+  dimension: robustness
+  method: llm_judge
+  check: 避免重复回复；如需重申，换种方式礼貌表达
+  weight: 0.1
+  category: constraint
+  confidence: 0.75
+- id: behavior.out_of_scope
+  dimension: robustness
+  method: llm_judge
+  check: 当骑手问超出职责范围的问题时，站长是否回复“我向同事确认后再回电给你。我现在能回答的先回答。”
+  weight: 0.15
+  trigger:
+    type: user_keyword
+    desc: 用户问超出职责范围问题
+    keywords:
+    - 投诉
+    - 工资
+    - 账号
+    - 其他
+  category: behavior
+  confidence: 0.85
+- id: behavior.hang_up_after_comfort
+  dimension: robustness
+  method: llm_judge
+  check: 当骑手坚持确实无法配送时，站长是否安慰骑手后挂断电话
+  weight: 0.15
+  trigger:
+    type: user_keyword
+    desc: 骑手坚持无法配送
+    keywords:
+    - 实在
+    - 确实
+    - 不能
+    - 无法
+  category: behavior
+  confidence: 0.82
+- id: role.no_ai_disclosure
+  dimension: robustness
+  method: blacklist
+  check: 回复中不出现 AI、机器人、人工智能等暴露身份的词汇
+  weight: 0.15
+  params:
+    blacklist:
+    - AI
+    - 人工智能
+    - 机器人
+    - 语言模型
+    - 虚拟助手
+    - 我不是真人
+  category: role
+  confidence: 0.95
+- id: safety.no_hallucinated_numbers
+  dimension: safety
+  method: number_whitelist
+  check: 不编造任务变量外的数字
+  weight: 1.0
+  is_safety: true
+  params:
+    whitelist:
+    - '15'
+    - '20'
+    - '3'
+    - '22'
+    - '2'
+  category: safety
+  confidence: 0.9

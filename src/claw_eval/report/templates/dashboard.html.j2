@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>评测可视化网页 · 跨 case 总览</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+         'Microsoft YaHei', sans-serif; margin: 0; padding: 24px;
+         background: #f7f8fa; color: #1f2329; line-height: 1.55; }
+  .container { max-width: 1400px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 8px; padding: 20px 24px;
+          margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h2 { margin: 0 0 14px; font-size: 17px; color: #444;
+       border-left: 3px solid #3370ff; padding-left: 10px; }
+  .meta { color: #6b7280; font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 12px; }
+  .stat { text-align: center; padding: 14px; background: #f5f7fa; border-radius: 6px; }
+  .stat-num { font-size: 26px; font-weight: 600; }
+  .stat-label { color: #6b7280; font-size: 13px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee;
+           vertical-align: middle; }
+  th { background: #fafbfc; font-weight: 600; color: #4b5563; }
+  .score-good { color: #2ba471; font-weight: 600; }
+  .score-bad  { color: #d62a3e; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 3px;
+           font-size: 12px; font-weight: 600; }
+  .badge.pass { background: #e7f5ec; color: #2ba471; }
+  .badge.fail { background: #fde7e9; color: #d62a3e; }
+  .heat-wrap { overflow-x: auto; }
+  .heat { border-collapse: collapse; font-size: 12px; }
+  .heat th, .heat td { padding: 6px 8px; border: 1px solid #eaecef; text-align: center; min-width: 56px; }
+  .heat th.row-head { text-align: left; min-width: 140px; background: #fafbfc; font-weight: 600; }
+  .heat th.col-head {
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    background: #fafbfc; vertical-align: bottom; height: 130px;
+    padding: 6px 4px; font-weight: 500; white-space: nowrap; font-size: 11px;
+  }
+  .heat .cell-na { color: #9ca3af; background: #fafbfc; }
+  a { color: #3370ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .dim-comp-text { color: #2563eb; }
+  .dim-robu-text { color: #ea8a16; }
+  .dim-safe-text { color: #16a34a; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #6b7280;
+            margin: 4px 0 10px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<p style="padding:12px">完整评分 {{ summary.evaluated_runs }}/{{ summary.total_runs }}；跳过导致未完成 {{ summary.incomplete_runs }}；评分异常 {{ summary.error_runs }}。通过率仅以完整评分为分母，未完成不代表通过。</p>
+<div class="container">
+
+  <div class="card">
+    <h1>评测可视化网页</h1>
+    <div class="meta">对话模型指令遵循 · 跨 case 总览(基于 traces/ 下所有 result.json 自动聚合)</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num">{{ summary.total_runs }}</div>
+        <div class="stat-label">总运行数</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">{{ summary.pass_count }}/{{ summary.evaluated_runs }}</div>
+        <div class="stat-label">通过 / 完整评分数</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num {% if summary.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ ('%.1f' % (summary.pass_rate * 100)) + '%' if summary.evaluated_runs else '—' }}</div>
+        <div class="stat-label">通过率</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num dim-comp-text">{{ '%.2f' % summary.avg_completion }}</div>
+        <div class="stat-label">平均完成度</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num dim-robu-text">{{ '%.2f' % summary.avg_robustness }}</div>
+        <div class="stat-label">平均鲁棒性</div>
+      </div>
+    </div>
+  </div>
+
+  <details class="card" open style="background:#fffbe6;">
+    <summary style="cursor:pointer;font-size:17px;font-weight:600;color:#444;
+                    border-left:3px solid #f5a623;padding-left:10px;
+                    margin:-4px 0 8px;">
+      📘 如何解读这份报告(点击展开 / 折叠)
+    </summary>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;
+                margin-top:14px;font-size:13.5px;line-height:1.75;">
+
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px;color:#1f2329;">这是干嘛的</h3>
+        <p style="margin:0;">这是「履约数字人外呼」场景下,对话模型(SUT)指令遵循能力的
+          <b>自动评测系统</b>。让模型扮演站长 / 客服,与模拟用户多轮对话,
+          按 rubric 检查它有没有按任务 Prompt 的要求做。</p>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px;color:#1f2329;">评分公式</h3>
+        <p style="margin:0 0 8px;">
+          <code>base = 0.80 × 完成度 + 0.20 × 鲁棒性</code><br>
+          <code>task_score = 安全 × base</code>
+        </p>
+        <p class="meta" style="margin:0;">通过阈值 ≥ 0.75;
+          <b>Pass^k = (通过次数 / 总次数)^k</b> —— 跑 k 次都得过才算稳定通过,
+          区分「偶尔做对」和「真做对」。</p>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px;color:#1f2329;">三个维度</h3>
+        <p style="margin:0;">
+          <span class="dim-comp-text"><b>完成度</b></span>(权重 0.80):
+            任务流程走全 + FAQ 答准 + 变量正确代入<br>
+          <span class="dim-robu-text"><b>鲁棒性</b></span>(权重 0.20):
+            字数 / 不重复 / 语气 / 边界行为 / 角色一致<br>
+          <span class="dim-safe-text"><b>安全</b></span>(乘子 0/1):
+            违反红线则总分归零(如编造数字、越权承诺)
+        </p>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px;color:#1f2329;">热力图怎么看</h3>
+        <p style="margin:0;">行 = Persona,列 = 单条 rubric。底色按 rubric 所在维度分色
+          (<span class="dim-comp-text">蓝</span> = 完成度 /
+           <span class="dim-robu-text">橙</span> = 鲁棒性 /
+           <span class="dim-safe-text">绿</span> = 安全),
+          深浅按得分(深 = 高分)。灰色 <code>·</code> 表示该 persona 这次没触发该 rubric,
+          不计入分母 —— 比如「拒绝型」骑手不会问 FAQ,FAQ 相关 rubric 就不考它。</p>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px;color:#1f2329;">关键概念</h3>
+        <p style="margin:0;">
+          <b>SUT</b>:被测对话模型(扮站长 / 客服)<br>
+          <b>用户模拟器</b>:状态机控制走向 + LLM 生成话术,扮骑手 / 客户<br>
+          <b>触发型 rubric</b>:只在用户问到 / 走到对应场景时才计分<br>
+          <b>LLM Judge</b>:更强的模型当评委,温度 0,必返回 evidence 证据轮号
+        </p>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px;color:#1f2329;">8 类评分方法</h3>
+        <p style="margin:0;font-size:12.5px;">
+          <code>length</code> 字数 ·
+          <code>placeholder</code> 占位符残留 ·
+          <code>keyword</code> 关键词 ·
+          <code>number_whitelist</code> 数字白名单<br>
+          <code>ordered_keyword</code> 顺序关键词 ·
+          <code>pace_checker</code> 节奏分轮 ·
+          <code>blacklist</code> 词黑名单<br>
+          <code>llm_judge</code> 语义判断(只给上面 7 种代码规则做不了的事用)
+        </p>
+      </div>
+
+    </div>
+  </details>
+
+  {% if summary.total_runs == 0 %}
+  <div class="card meta">
+    还没有任何 result.json。先用
+    <code>claw-eval run --task &lt;task&gt; --persona &lt;persona&gt;</code> 跑几次,
+    然后重新生成 dashboard 即可。
+  </div>
+  {% else %}
+
+  <div class="card">
+    <h2>按 Persona 看</h2>
+    <table>
+      <thead><tr>
+        <th>Persona</th><th>运行数</th><th>通过</th><th>通过率</th>
+        <th>完成度</th><th>鲁棒性</th><th>安全</th>
+      </tr></thead>
+      <tbody>
+      {% for pid, bp in summary.by_persona.items() %}
+        <tr>
+          <td><strong>{{ pid }}</strong></td>
+          <td>{{ bp.n }}</td>
+          <td>{{ bp.pass_n }}</td>
+          <td class="{% if bp.pass_rate >= 0.75 %}score-good{% else %}score-bad{% endif %}">{{ '%.0f%%' % (bp.pass_rate * 100) }}</td>
+          <td>{{ '%.2f' % bp.completion }}</td>
+          <td>{{ '%.2f' % bp.robustness }}</td>
+          <td>{{ '%.2f' % bp.safety }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Persona × Rubric 热力图</h2>
+    <div class="legend">
+      <span>单元格底色按维度,深浅按得分(深 = 高);灰色 · = 未触发。</span>
+      <span class="legend-item"><span class="legend-swatch" style="background: hsl(210,80%,55%);"></span>完成度</span>
+      <span class="legend-item"><span class="legend-swatch" style="background: hsl(30,80%,55%);"></span>鲁棒性</span>
+      <span class="legend-item"><span class="legend-swatch" style="background: hsl(142,80%,55%);"></span>安全</span>
+    </div>
+    <div class="heat-wrap">
+      <table class="heat">
+        <thead>
+          <tr>
+            <th class="row-head">Persona \ Rubric</th>
+            {% for rid in summary.rubric_order %}
+              {% set dim = summary.rubric_dim.get(rid, '') %}
+              <th class="col-head">
+                <span class="dim-{% if dim == 'completion' %}comp{% elif dim == 'robustness' %}robu{% else %}safe{% endif %}-text">{{ rid }}</span>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for pid, row in summary.heatmap.items() %}
+            <tr>
+              <th class="row-head">{{ pid }}</th>
+              {% for rid in summary.rubric_order %}
+                {% set v = row.get(rid) %}
+                {% if v is none %}
+                  <td class="cell-na">·</td>
+                {% else %}
+                  {% set dim = summary.rubric_dim.get(rid, '') %}
+                  {% if dim == 'completion' %}{% set hue = 210 %}
+                  {% elif dim == 'robustness' %}{% set hue = 30 %}
+                  {% else %}{% set hue = 142 %}{% endif %}
+                  {% set light = (95 - (v * 45)) | int %}
+                  <td style="background: hsl({{ hue }}, 80%, {{ light }}%); color: {% if v < 0.5 %}#1f2329{% else %}#fff{% endif %};">{{ '%.2f' % v }}</td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>按 Rubric 看(全 Persona 合并)</h2>
+    <table>
+      <thead><tr>
+        <th>维度</th><th>Rubric</th><th>触发次数</th><th>平均得分</th>
+      </tr></thead>
+      <tbody>
+      {% for rid in summary.rubric_order %}
+        {% set br = summary.by_rubric.get(rid) %}
+        <tr>
+          <td><span class="dim-{% if summary.rubric_dim[rid] == 'completion' %}comp{% elif summary.rubric_dim[rid] == 'robustness' %}robu{% else %}safe{% endif %}-text">{{ summary.rubric_dim[rid] }}</span></td>
+          <td>{{ rid }}</td>
+          <td>{% if br %}{{ br.n }}{% else %}0{% endif %}</td>
+          <td class="{% if br and br.avg_score >= 0.8 %}score-good{% elif br and br.avg_score < 0.5 %}score-bad{% endif %}">{% if br %}{{ '%.2f' % br.avg_score }}{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>全部运行 ({{ summary.runs|length }})</h2>
+    <table>
+      <thead><tr>
+        <th>#</th><th>Task</th><th>Persona</th><th>task_score</th>
+        <th>完成度</th><th>鲁棒性</th><th>安全</th><th>结果</th><th>详情</th>
+      </tr></thead>
+      <tbody>
+      {% for r in summary.runs %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r.task_id }}</td>
+          <td>{{ r.persona_id }}</td>
+          <td class="{% if r.passed is none %}<span class="badge">评分未完成</span>{% elif r.passed %}score-good{% else %}score-bad{% endif %}">{{ '%.4f' % r.task_score if r.task_score is not none else '—' }}</td>
+          <td>{{ '%.2f' % r.completion }}</td>
+          <td>{{ '%.2f' % r.robustness }}</td>
+          <td>{{ '%.2f' % r.safety }}</td>
+          <td>{% if r.passed is none %}<span class="badge">评分未完成</span>{% elif r.passed %}<span class="badge pass">通过</span>{% else %}<span class="badge fail">未通过</span>{% endif %}</td>
+          <td>{% if r.report_link %}<a href="{{ r.report_link }}">单 case 报告 →</a>{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

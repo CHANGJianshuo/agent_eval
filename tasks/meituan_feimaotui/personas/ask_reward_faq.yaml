@@ -1,0 +1,21 @@
+id: ask_reward_faq
+name: 询问额外奖励
+scenario: '你是飞毛腿骑手。站长讲解配送约束时，你想知道多跑有没有额外好处，
+
+  于是询问奖励规则。得到答复后表示有动力会坚持，继续走完流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_reward
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_reward
+  inject_at_turn: 2
+  text: 要是连续跑满这几天，有没有什么奖励？
+  description: 触发 faq_reward 节点
+max_rounds: 9

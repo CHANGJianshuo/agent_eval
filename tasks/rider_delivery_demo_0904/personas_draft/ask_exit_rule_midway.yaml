@@ -1,0 +1,20 @@
+id: ask_exit_rule_midway
+name: step2时问退出规则
+scenario: '你是接到电话的骑手。对方介绍完连续配送和安全提醒后，你询问退出飞毛腿的规则。
+
+  对方解答后，你表示了解，随后对方说明排名机制，你继续配合，对话自然结束。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_exit
+- step3
+- end
+probes:
+- id: trigger_faq_exit
+  inject_at_turn: 3
+  text: 我后面要是想退出，得提前多久说啊？
+  description: 触发 faq_exit 节点
+max_rounds: 9

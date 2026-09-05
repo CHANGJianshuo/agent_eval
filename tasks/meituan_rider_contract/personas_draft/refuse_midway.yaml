@@ -1,0 +1,24 @@
+id: refuse_midway
+name: 中途坚持拒绝配送
+scenario: '你是接到电话的用户。确认身份并听完前两步说明后，在对方挽留时明确表示
+
+  今天确实有事无法配送，坚持不改口。被安慰后挂断电话。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- give_up_end
+- end
+probes:
+- id: trigger_refusal
+  inject_at_turn: 2
+  text: 我今天不太想跑了，能不能不送？
+  description: 触发挽留与鼓励
+- id: trigger_insist_refusal
+  inject_at_turn: 3
+  text: 我今天确实有事，真的没法配送。
+  description: 触发安慰后结束通话
+max_rounds: 7

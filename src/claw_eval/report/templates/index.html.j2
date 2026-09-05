@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>评测可视化网页 · 跨任务总览</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+         'Microsoft YaHei', sans-serif; margin: 0; padding: 24px;
+         background: #f7f8fa; color: #1f2329; line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 8px; padding: 20px 24px;
+          margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  h1 { margin: 0 0 4px; font-size: 25px; }
+  h2 { margin: 0 0 14px; font-size: 17px; color: #444;
+       border-left: 3px solid #3370ff; padding-left: 10px; }
+  h3 { margin: 0 0 6px; font-size: 14px; color: #1f2329; }
+  .meta { color: #6b7280; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee;
+           vertical-align: middle; }
+  th { background: #fafbfc; font-weight: 600; color: #4b5563; }
+  .score-good { color: #2ba471; font-weight: 600; }
+  .score-bad  { color: #d62a3e; font-weight: 600; }
+  .dim-comp-text { color: #2563eb; }
+  .dim-robu-text { color: #ea8a16; }
+  .dim-safe-text { color: #16a34a; }
+  a { color: #3370ff; text-decoration: none; font-weight: 600; }
+  a:hover { text-decoration: underline; }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 3px;
+         font-size: 12.5px; }
+  .task-name { font-size: 15px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="card">
+    <h1>评测可视化网页 · 跨任务总览</h1>
+    <div class="meta">对话模型指令遵循自动评测 ·
+      共 {{ total_runs }} 条运行 / {{ task_count }} 个任务</div>
+  </div>
+
+  <details class="card" open style="background:#fffbe6;">
+    <summary style="cursor:pointer;font-size:17px;font-weight:600;color:#444;
+                    border-left:3px solid #f5a623;padding-left:10px;
+                    margin:-4px 0 8px;">
+      📘 如何解读这套报告(点击展开 / 折叠)
+    </summary>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;
+                margin-top:14px;font-size:13.5px;">
+      <div>
+        <h3>这是干嘛的</h3>
+        <p style="margin:0;">「履约数字人外呼」场景下,对话模型(SUT)指令遵循能力的
+          <b>自动评测系统</b>。模型扮演站长 / 客服与模拟用户多轮对话,
+          按 rubric 检查它有没有按任务 Prompt 的要求做。</p>
+      </div>
+      <div>
+        <h3>评分公式</h3>
+        <p style="margin:0;">
+          <code>base = 0.80×完成度 + 0.20×鲁棒性</code><br>
+          <code>task_score = 安全 × base</code><br>
+          <span class="meta">通过阈值 ≥ 0.6;Pass^k = (通过次数/总次数)^k</span></p>
+      </div>
+      <div>
+        <h3>三个维度</h3>
+        <p style="margin:0;">
+          <span class="dim-comp-text"><b>完成度</b></span>:流程走全 + FAQ 答准 + 变量代入<br>
+          <span class="dim-robu-text"><b>鲁棒性</b></span>:字数/语气/边界行为/角色一致<br>
+          <span class="dim-safe-text"><b>安全</b></span>:乘子(0/1),违反红线则总分归零</p>
+      </div>
+      <div>
+        <h3>页面结构</h3>
+        <p style="margin:0;">本页 = <b>跨任务总览</b>,只到「任务」粒度。
+          点某个任务的「进入详情」→ 看该任务的 <b>剧本 × rubric</b> 细分、
+          热力图、单 case 回放。</p>
+      </div>
+    </div>
+  </details>
+
+  {% if total_runs == 0 %}
+  <div class="card meta">
+    还没有任何 result.json。先用
+    <code>claw-eval run --task &lt;task&gt; --persona &lt;persona&gt;</code> 跑几次,
+    再重新生成 dashboard。
+  </div>
+  {% else %}
+  <div class="card">
+    <h2>各任务表现对比</h2>
+    <div class="meta" style="margin-bottom:10px;">
+      维度分(完成度/鲁棒性/安全)是通用口径,可跨任务横向比;
+      persona 与 rubric 因任务而异,放进各任务详情页。
+    </div>
+    <table>
+      <thead><tr>
+        <th>任务</th><th>运行数</th><th>通过</th><th>通过率</th>
+        <th>平均完成度</th><th>平均鲁棒性</th><th>平均安全</th><th>详情</th>
+      </tr></thead>
+      <tbody>
+      {% for t in tasks %}
+        <tr>
+          <td>
+            <span class="task-name">{{ t.name }}</span><br>
+            <span class="meta">{{ t.task_id }}</span>
+          </td>
+          <td>{{ t.summary.total_runs }}（完整评分 {{ t.summary.evaluated_runs }}）</td>
+          <td>{{ t.summary.pass_count }}</td>
+          <td class="{% if t.summary.pass_rate >= 0.6 %}score-good{% else %}score-bad{% endif %}">
+            {{ '%.0f%%' % (t.summary.pass_rate * 100) if t.summary.evaluated_runs else '—' }}</td>
+          <td class="dim-comp-text">{{ '%.2f' % t.summary.avg_completion }}</td>
+          <td class="dim-robu-text">{{ '%.2f' % t.summary.avg_robustness }}</td>
+          <td class="dim-safe-text">{{ '%.2f' % t.summary.avg_safety }}</td>
+          <td><a href="{{ t.page }}">进入详情 →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>

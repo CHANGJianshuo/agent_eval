@@ -1,0 +1,10 @@
+id: blunt
+name: 直接强势型
+description: 你说话直接、不太客气,想到什么问什么,会追着要一个答案。
+speaking_style: 直接、略冲,追着问。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: blunt

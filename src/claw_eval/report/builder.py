@@ -1,0 +1,397 @@
+"""HTML 报告与可视化网页生成。
+
+多页结构:
+- index.html        —— 跨任务总览(任务级对比 + 链接到各任务详情页)
+- task_<id>.html    —— 单任务完整分析(该任务 persona × 该任务 rubric)
+- cases/<x>.html    —— 单 case 报告(对话回放 + 违规高亮 + 维度雷达)
+"""
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+import yaml
+
+from ..models.flow import load_flow
+from ..models.trace import GradingResult, TraceMessage
+from ..runner.trace_io import load_trace
+from .aggregate import aggregate, load_results_dir
+from .flow_viz import (
+    aggregate_rubric_scores,
+    build_flow_option,
+    case_rubric_scores,
+)
+
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+REPORT_VERSION = 2  # Completion denominators and safety unknowns were corrected in v2.
+
+
+def report_is_current(out_dir: Path, task_id: str) -> bool:
+    if not (out_dir / f'task_{task_id}.html').is_file():
+        return False
+    try:
+        return json.loads((out_dir / 'report_version.json').read_text())['version'] == REPORT_VERSION
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def _project_root() -> Path:
+    """Find the checkout root without making assumptions about trace depth."""
+    current = Path(__file__).resolve()
+    for candidate in [current.parent, *current.parents]:
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    return Path.cwd().resolve()
+
+
+_PROJECT_ROOT = _project_root()
+
+
+def _env():
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    return Environment(
+        loader=FileSystemLoader(str(_TEMPLATES_DIR)),
+        autoescape=select_autoescape(["html", "j2"]),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+
+def load_result(path: str | Path) -> GradingResult:
+    """从 .result.json 加载 GradingResult。"""
+    with open(path, encoding="utf-8") as f:
+        return GradingResult.model_validate(json.load(f))
+
+
+def _build_turn_view(messages: list[TraceMessage], result: GradingResult):
+    """逐轮拼出展示用结构,带违规高亮。"""
+    vmap: dict[int, list] = {}
+    for v in result.violations:
+        if v.turn is not None:
+            vmap.setdefault(v.turn, []).append(v)
+    return [{
+        "turn": m.turn, "role": m.role, "text": m.text, "state": m.state,
+        "is_probe": m.is_probe, "violations": vmap.get(m.turn, []),
+    } for m in messages]
+
+
+def _resolve_trace_path(trace_path: str | None) -> Path | None:
+    """Resolve current, relative, and checkout-moved trace paths."""
+    if not trace_path:
+        return None
+
+    raw = Path(trace_path).expanduser()
+    candidates = [raw]
+    if not raw.is_absolute():
+        candidates.extend([_PROJECT_ROOT / raw, Path.cwd() / raw])
+
+    # Results created before a checkout was moved contain an obsolete absolute
+    # prefix. Preserve the path below ``traces/`` and rebase it onto this repo.
+    if "traces" in raw.parts:
+        idx = raw.parts.index("traces")
+        relative = Path(*raw.parts[idx + 1:])
+        candidates.append(_PROJECT_ROOT / "traces" / relative)
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    return None
+
+
+def _infer_task_dir(result: GradingResult) -> Path | None:
+    """Locate ``tasks/<task_id>`` for flat or nested trace layouts."""
+    trace = _resolve_trace_path(result.trace_path)
+    if result.input_hash:
+        from ..runs import load_manifest
+        root = trace.parent.parent.parent if trace else _PROJECT_ROOT
+        manifest = load_manifest(root, result.run_id)
+        if manifest["input_hash"] != result.input_hash:
+            raise ValueError("结果与输入快照不匹配")
+        return root / "traces" / result.run_id / "inputs" / "tasks" / result.task_id
+    canonical = _PROJECT_ROOT / "tasks" / result.task_id
+    if canonical.is_dir():
+        return canonical
+
+    trace = _resolve_trace_path(result.trace_path)
+    if trace:
+        for parent in trace.parents:
+            candidate = parent / "tasks" / result.task_id
+            if candidate.is_dir():
+                return candidate
+    return None
+
+
+def _flow_option_for_case(result: GradingResult,
+                          task_dir: Path | None) -> dict | None:
+    if not task_dir:
+        return None
+    flow = load_flow(Path(task_dir) / "flow.yaml")
+    if not flow:
+        return None
+    scores = case_rubric_scores(result.rubric_scores)
+    return build_flow_option(flow, scores)
+
+
+def build_case_report(result: GradingResult, out_path: str | Path,
+                      task_dir: str | Path | None = None) -> Path:
+    """渲染单 case HTML 报告。task_dir 不传时按 trace 路径推断,用于加载 flow.yaml。"""
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    messages: list[TraceMessage] = []
+    trace_path = _resolve_trace_path(result.trace_path)
+    if trace_path:
+        _start, messages, _end = load_trace(trace_path)
+
+    tdir = Path(task_dir) if task_dir else _infer_task_dir(result)
+    flow_option = _flow_option_for_case(result, tdir)
+
+    html = _env().get_template("case_report.html.j2").render(
+        result=result,
+        dim=result.dimension_scores,
+        turns=_build_turn_view(messages, result),
+        triggered=[r for r in result.rubric_scores if r.status == "scored"],
+        skipped=[r for r in result.rubric_scores if r.status != "scored"],
+        flow_option=flow_option,
+    )
+    out_path.write_text(html, encoding="utf-8")
+    return out_path
+
+
+_DIM_LABELS = {
+    "attitude": "性格", "mbti": "MBTI", "gender": "性别",
+    "age_range": "年龄段", "education": "教育",
+}
+
+
+def _compute_dimensions_analysis(results: list[GradingResult]) -> dict:
+    """对每个维度属性值统计:命中数 + 通过率。
+
+    只看 result.demographics 非空的(即 --dimensions 模式生成的)。
+    返回:{
+      "attitude": [{"value": "cooperative", "n": 15, "pass_rate": 0.6, ...}, ...],
+      ...
+    }
+    """
+    by_dim: dict[str, dict[str, dict]] = {}
+    for r in results:
+        demo = getattr(r, "demographics", None) or {}
+        if not demo or r.status != "complete":
+            continue
+        for dim, val in demo.items():
+            d = by_dim.setdefault(dim, {})
+            v = d.setdefault(val, {"n": 0, "pass_n": 0, "score_sum": 0.0})
+            v["n"] += 1
+            v["score_sum"] += r.task_score
+            if r.passed:
+                v["pass_n"] += 1
+
+    out = {}
+    for dim, vals in by_dim.items():
+        rows = []
+        for val, stats in vals.items():
+            n = stats["n"]
+            rows.append({
+                "value": val,
+                "n": n,
+                "pass_n": stats["pass_n"],
+                "pass_rate": stats["pass_n"] / n if n else 0,
+                "avg_score": stats["score_sum"] / n if n else 0,
+            })
+        rows.sort(key=lambda x: -x["n"])
+        out[dim] = {
+            "label": _DIM_LABELS.get(dim, dim),
+            "rows": rows,
+            "total_n": sum(r["n"] for r in rows),
+        }
+    return out
+
+
+def build_dashboard(results: list[GradingResult], out_dir: str | Path,
+                    task_names: dict[str, str] | None = None) -> Path:
+    """按任务分组渲染:index 总览 + 每任务详情页 + 各单 case 报告。
+
+    返回 index.html 路径。
+    """
+    out_dir = Path(out_dir)
+    cases_dir = out_dir / "cases"
+    # cases/ 是全量重建的产物目录,先清空避免旧命名残留
+    if cases_dir.exists():
+        shutil.rmtree(cases_dir)
+    cases_dir.mkdir(parents=True, exist_ok=True)
+    task_names = task_names or {}
+    env = _env()
+
+    # 按 task_id 分组
+    groups: dict[str, list[GradingResult]] = {}
+    for r in results:
+        groups.setdefault(r.task_id, []).append(r)
+
+    tasks_meta: list[dict] = []
+    for task_id in sorted(groups):
+        task_results = groups[task_id]
+        summary = aggregate(task_results)
+
+        # 推断 tasks/<id>/ 读 flow.yaml,生成「跨 case 平均」着色的流程图
+        task_dir = _infer_task_dir(task_results[0]) if task_results else None
+        flow_option = None
+        rubric_meta: dict[str, str] = {}
+        persona_meta: dict[str, str] = {}
+        persona_demo: dict[str, dict] = {}      # NEW: demographics
+        if task_dir:
+            flow = load_flow(task_dir / "flow.yaml")
+            if flow:
+                flow_option = build_flow_option(
+                    flow, aggregate_rubric_scores(summary.by_rubric))
+            # 加载 rubric.check 作为「备注」
+            try:
+                from ..models.rubric import load_rubrics as _load_r
+                for r in _load_r(task_dir / "rubrics.yaml"):
+                    rubric_meta[r.id] = r.check
+            except Exception:  # noqa: BLE001
+                pass
+            # 加载 persona 名 + 性格 description 作为「备注」
+            try:
+                from ..models.persona import load_persona as _load_p
+                root = task_dir.parent.parent
+                p_dir = root / "personalities"
+                n_file = root / "configs" / "noise_profiles.yaml"
+                for pf in (task_dir / "personas").glob("*.yaml"):
+                    try:
+                        p = _load_p(pf, personalities_dir=p_dir, noise_file=n_file)
+                        label = p.name if p.name else p.id
+                        persona_meta[p.id] = f"{label} · {p.description}"
+                        # demographics dict for table display
+                        persona_demo[p.id] = {
+                            "mbti": p.demographics.mbti,
+                            "age": p.demographics.age_range,
+                            "gender": p.demographics.gender,
+                            "education": p.demographics.education,
+                            "attitude": p.demographics.attitude,
+                        }
+                    except Exception:  # noqa: BLE001
+                        pass
+            except Exception:  # noqa: BLE001
+                pass
+
+        # 每条 result 出单 case 报告(传 task_dir 让单 case 流程图也能渲染)
+        for idx, (run, r) in enumerate(zip(summary.runs, task_results)):
+            stem = f"{task_id}_{r.persona_id or 'unknown'}_{idx + 1:02d}"
+            build_case_report(r, cases_dir / f"{stem}.html", task_dir=_infer_task_dir(r))
+            run["report_link"] = f"cases/{stem}.html"
+
+        # 若有改进建议文件,加载并传给模板
+        rec_file = out_dir / f"recommendations_{task_id}.json"
+        recommendations: list[dict] = []
+        if rec_file.exists():
+            try:
+                recommendations = json.loads(
+                    rec_file.read_text(encoding="utf-8")
+                ).get("recommendations", [])
+            except Exception:  # noqa: BLE001
+                pass
+
+        # 若有回归对比 JSON,加载并传给模板(T10 dashboard 集成)
+        reg_file = out_dir / f"regression_{task_id}.json"
+        regression: dict | None = None
+        if reg_file.exists():
+            try:
+                regression = json.loads(
+                    reg_file.read_text(encoding="utf-8"))
+                if 'comparable' not in regression:
+                    regression = None  # Legacy comparisons did not verify benchmark conditions.
+            except Exception:  # noqa: BLE001
+                pass
+
+        # 若有安全红队 JSON,加载并传给模板(T8 dashboard 集成)
+        sec_file = out_dir / f"safety_test_{task_id}.json"
+        safety_test: dict | None = None
+        if sec_file.exists():
+            try:
+                safety_test = json.loads(
+                    sec_file.read_text(encoding="utf-8"))
+                if 'n_assessed_cases' not in safety_test:
+                    safety_test.update(legacy_statistics=True, overall_breach_rate=None, n_assessed_cases=0,
+                                       n_unknown_cases=safety_test.get('n_results', len(task_results)),
+                                       n_breached_cases=0, by_rubric=[], by_persona=[])
+            except Exception:  # noqa: BLE001
+                pass
+
+        # 维度分析:每个维度属性值的命中数 + pass rate
+        dimensions_analysis = _compute_dimensions_analysis(task_results)
+
+        page_file = f"task_{task_id}.html"
+        html = env.get_template("task_page.html.j2").render(
+            task_id=task_id,
+            task_name=task_names.get(task_id, task_id),
+            summary=summary,
+            flow_option=flow_option,
+            recommendations=recommendations,
+            regression=regression,
+            safety_test=safety_test,
+            rubric_meta=rubric_meta,
+            persona_meta=persona_meta,
+            persona_demo=persona_demo,
+            dimensions_analysis=dimensions_analysis,
+        )
+        (out_dir / page_file).write_text(html, encoding="utf-8")
+
+        tasks_meta.append({
+            "task_id": task_id,
+            "name": task_names.get(task_id, task_id),
+            "page": page_file,
+            "summary": summary,
+        })
+
+    index_html = env.get_template("index.html.j2").render(
+        tasks=tasks_meta,
+        total_runs=len(results),
+        task_count=len(groups),
+    )
+    out_path = out_dir / "index.html"
+    out_path.write_text(index_html, encoding="utf-8")
+    from ..runs import atomic_json
+    atomic_json(out_dir / 'report_version.json', {'version': REPORT_VERSION})
+    return out_path
+
+
+def build_dashboard_from_dir(traces_dir: str | Path,
+                             out_dir: str | Path) -> Path:
+    """便捷入口:从 traces_dir 收集所有 result.json,生成多页 dashboard。
+
+    顺带从 <repo>/tasks/<id>/task.yaml 取任务中文名。
+    支持两种布局:
+      - traces/          → 递归扫所有子目录(全局)
+      - traces/<run_id>/ → 扫当前目录(单次运行)
+    """
+    results = load_results_dir(traces_dir)
+
+    task_names: dict[str, str] = {}
+    # 寻找 tasks/ 目录:支持 traces/、traces/<run_id>/ 以及更深层布局。
+    td = Path(traces_dir).resolve()
+    candidates = [_PROJECT_ROOT / "tasks"]
+    candidates.extend(parent / "tasks" for parent in [td, *td.parents])
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_dir():
+            for tdir in sorted(candidate.iterdir()):
+                ty = tdir / "task.yaml"
+                if ty.exists():
+                    try:
+                        data = yaml.safe_load(ty.read_text(encoding="utf-8"))
+                        task_names[data.get("task_id", tdir.name)] = \
+                            data.get("task_name", tdir.name)
+                    except Exception:  # noqa: BLE001
+                        pass
+            break
+
+    for result in results:
+        if result.input_hash:
+            task_dir = _infer_task_dir(result)
+            data = yaml.safe_load((task_dir / "task.yaml").read_text(encoding="utf-8"))
+            task_names[result.task_id] = data.get("task_name", result.task_id)
+    return build_dashboard(results, out_dir, task_names)

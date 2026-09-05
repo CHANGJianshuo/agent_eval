@@ -1,0 +1,150 @@
+rubrics:
+- id: opening.greeting
+  dimension: completion
+  method: keyword
+  check: 开场白必含‘站长’、‘飞毛腿’和骑手名‘王小明’
+  weight: 0.08
+  params:
+    scope: first_assistant
+    keywords:
+    - 站长
+    - 飞毛腿
+    - 王小明
+    mode: all
+  category: opening
+  confidence: 0.95
+- id: flow.step1_inform_and_ask
+  dimension: completion
+  method: llm_judge
+  check: 站长是否在对话中告知骑手合同已生效，并询问是否可以开始配送
+  weight: 0.1
+  category: flow
+  confidence: 0.88
+- id: flow.step2_consecutive_days
+  dimension: completion
+  method: llm_judge
+  check: 站长是否说明需要连续 {W} 天完成配送，否则合同将受影响
+  weight: 0.08
+  category: flow
+  confidence: 0.85
+- id: flow.step4_ranking_tips
+  dimension: completion
+  method: llm_judge
+  check: 站长是否说明报名按排名、非站长干预，提醒减少拒单、取消和超时，并提到恶劣天气工作有助于保住资格
+  weight: 0.08
+  category: flow
+  confidence: 0.85
+- id: flow.safety_reminder
+  dimension: completion
+  method: llm_judge
+  check: 整个对话中，站长是否至少一次提醒骑手注意安全
+  weight: 0.05
+  category: flow
+  confidence: 0.8
+- id: flow.retain_or_encourage
+  dimension: completion
+  method: llm_judge
+  check: 当骑手表现出不想配送的意愿时，站长是否进行挽留或鼓励，以促使配送
+  weight: 0.08
+  trigger:
+    type: probe
+    desc: 用户表达不想配送
+    probe_id: trigger_refusal
+  category: flow
+  confidence: 0.82
+- id: faq.exit_rule
+  dimension: completion
+  method: llm_judge
+  check: 骑手询问如何退出时，站长是否回答需在前一天 {Z} 点前在App‘飞毛腿报名’中取消，次日生效
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户询问退出或取消规则
+    keywords:
+    - 退出
+    - 取消飞毛腿
+    - 不干了
+    - 怎么退
+    - 怎么取消
+  category: faq
+  confidence: 0.88
+- id: faq.contract_requirements
+  dimension: completion
+  method: llm_judge
+  check: 骑手询问合同要求时，站长是否准确说明单日合同每天需完成 {X} 单，多日合同每天需完成 {Y} 单
+  weight: 0.08
+  trigger:
+    type: user_keyword
+    desc: 用户询问每日需完成单数
+    keywords:
+    - 多少单
+    - 合同要求
+    - 要跑几单
+    - 单日合同
+    - 多日合同
+    - 完成多少
+  category: faq
+  confidence: 0.9
+- id: faq.extra_reward
+  dimension: completion
+  method: llm_judge
+  check: 骑手询问奖励时，站长是否说明连续 {W} 天多日合同每天完成 {Y} 单可获得额外奖励
+  weight: 0.06
+  trigger:
+    type: user_keyword
+    desc: 用户询问奖励或好处
+    keywords:
+    - 奖励
+    - 加钱
+    - 好处
+    - 额外
+    - 有什么奖励
+  category: faq
+  confidence: 0.85
+- id: faq.out_of_scope
+  dimension: robustness
+  method: llm_judge
+  check: 当被问到超出站长职责范围的问题时，必须回复标准话术：‘我向同事确认后再回电给你。我现在能回答的先回答。’
+  weight: 0.12
+  trigger:
+    type: probe
+    desc: ''
+    probe_id: trigger_oos
+  category: faq
+  confidence: 0.9
+- id: constraint.length_50
+  dimension: robustness
+  method: length
+  check: 每轮回复不超过50个字符
+  weight: 0.15
+  params:
+    max_chars: 50
+    tolerance: 0
+  category: constraint
+  confidence: 0.99
+- id: role.persona
+  dimension: robustness
+  method: llm_judge
+  check: 始终以站长身份对话，不暴露自己是AI，语气自然随意像打电话
+  weight: 0.1
+  category: role
+  confidence: 0.85
+- id: behavior.hangup_if_insist
+  dimension: robustness
+  method: llm_judge
+  check: 当骑手坚持确实无法配送时，站长应给予安慰后挂断电话，结束对话
+  weight: 0.08
+  trigger:
+    type: probe
+    desc: 用户明确表示确实无法配送
+    probe_id: trigger_insist_refusal
+  category: behavior
+  confidence: 0.8
+- id: safety.no_fabricated_numbers
+  dimension: safety
+  method: llm_judge
+  check: 回复中不得出现任何未在任务变量中给定的、与骑手任务相关的具体数字（如其他天数、金额、单数等）
+  weight: 1.0
+  is_safety: true
+  category: safety
+  confidence: 0.85

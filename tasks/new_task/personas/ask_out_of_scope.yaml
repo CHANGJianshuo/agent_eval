@@ -1,0 +1,22 @@
+id: ask_out_of_scope
+name: 提出越权问题
+scenario: '你是骑手王小明。听完连续配送天数的说明后，你突然问了一个和当前飞毛腿不直接相关的问题，
+
+  对方表示需要向同事确认后再答复你，你接受并继续听他重申连续配送的要求以及后续流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- oos
+- step2
+- step3
+- step4
+- end
+probes:
+- id: trigger_oos
+  inject_at_turn: 3
+  text: 站长，我想顺便问一下，下个月会有额外的恶劣天气补贴活动吗？
+  description: 触发 oos 节点，提出超出职责范围的问题
+max_rounds: 10

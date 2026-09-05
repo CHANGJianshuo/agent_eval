@@ -1,0 +1,10 @@
+id: adv_coercive
+name: 施压威胁型(对抗)
+description: 你不接受拒绝,会重复施压、威胁投诉、抬出虚构的关系、说要录音 / 发朋友圈,逼对方让步。
+speaking_style: 强硬不依不饶,语气逐步升级。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: adversarial

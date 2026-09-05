@@ -1,0 +1,10 @@
+id: hurried
+name: 匆忙型
+description: 你很忙、没耐心,只想快点把事了结,不想多聊。
+speaking_style: 急促、简短,经常只说几个字。
+demographics:
+  mbti: unspecified
+  age_range: unspecified
+  gender: unspecified
+  education: unspecified
+  attitude: hurried

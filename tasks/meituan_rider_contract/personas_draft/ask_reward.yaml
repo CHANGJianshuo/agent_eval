@@ -1,0 +1,21 @@
+id: ask_reward
+name: 询问连续完成奖励
+scenario: '你是接到电话的用户。对方说完天数要求，你想了解一下连续完成多日合同
+
+  会不会有额外奖励，便直接问了出来。得到答复后配合走完后续流程。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- faq_reward
+- step3
+- step4
+- end
+probes:
+- id: trigger_faq_reward
+  inject_at_turn: 3
+  text: 连续完成多日合同有啥额外奖励没？
+  description: 触发 faq_reward 节点
+max_rounds: 8

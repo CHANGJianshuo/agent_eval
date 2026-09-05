@@ -1,0 +1,20 @@
+id: ask_bonus_rule_end
+name: step3时问奖励规则
+scenario: '你是接到电话的骑手。对方从开场到排名机制一路说明，你都表示了解。
+
+  在对方说到排名机制时，你追问连续完成后的额外奖励规则，对方解答后，你表示明白，对话结束。
+
+  '
+covers_flow_nodes:
+- opening
+- step1
+- step2
+- step3
+- faq_bonus
+- end
+probes:
+- id: trigger_faq_bonus
+  inject_at_turn: 4
+  text: 那连续三天都完成的话，奖励具体怎么算？
+  description: 触发 faq_bonus 节点
+max_rounds: 9
